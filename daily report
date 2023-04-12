@@ -1,0 +1,73 @@
+import os
+import pandas as pd
+from pyzabbix import ZabbixAPI
+
+# Zabbix API configuration
+ZABBIX_API_URL = 'http://zabbix_server_url/api_jsonrpc.php'  # Update with your Zabbix API URL
+ZABBIX_USERNAME = 'username'  # Update with your Zabbix username
+ZABBIX_PASSWORD = 'password'  # Update with your Zabbix password
+
+# Host group and month to generate report for
+HOST_GROUP_NAME = 'MyHostGroup'  # Update with your host group name
+MONTH = 4  # Update with the month number (1-12)
+
+# Connect to Zabbix API
+zabbix_api = ZabbixAPI(ZABBIX_API_URL)
+zabbix_api.login(ZABBIX_USERNAME, ZABBIX_PASSWORD)
+
+# Get host group ID
+host_group = zabbix_api.hostgroup.get(filter={"name": HOST_GROUP_NAME}, output="groupid")
+if not host_group:
+    print(f"Host group '{HOST_GROUP_NAME}' not found. Exiting...")
+    zabbix_api.logout()
+    os._exit(1)
+
+host_group_id = host_group[0]["groupid"]
+
+# Get hosts in the host group
+hosts = zabbix_api.host.get(groupids=[host_group_id], output=["hostid", "name"])
+
+# Fetch CPU and memory utilization for each host for the specified month
+data = []
+for host in hosts:
+    host_id = host["hostid"]
+    host_name = host["name"]
+
+    cpu_utilization = zabbix_api.history.get(itemids=[host_id], history=0, sortfield="clock", sortorder="ASC",
+                                             time_from=pd.Timestamp(f'2023-{MONTH:02d}-01').timestamp(),
+                                             time_till=pd.Timestamp(f'2023-{MONTH:02d}-31 23:59:59').timestamp(),
+                                             output="extend")
+    memory_utilization = zabbix_api.history.get(itemids=[host_id], history=1, sortfield="clock", sortorder="ASC",
+                                                time_from=pd.Timestamp(f'2023-{MONTH:02d}-01').timestamp(),
+                                                time_till=pd.Timestamp(f'2023-{MONTH:02d}-31 23:59:59').timestamp(),
+                                                output="extend")
+
+    # Process CPU and memory utilization data
+    cpu_utilization_data = {}
+    memory_utilization_data = {}
+    for item in cpu_utilization:
+        date = pd.to_datetime(item["clock"], unit="s").date()
+        value = float(item["value"])
+        cpu_utilization_data[date] = value
+
+    for item in memory_utilization:
+        date = pd.to_datetime(item["clock"], unit="s").date()
+        value = float(item["value"])
+        memory_utilization_data[date] = value
+
+    # Combine CPU and memory utilization data
+    for date, cpu_utilization in cpu_utilization_data.items():
+        if date in memory_utilization_data:
+            memory_utilization = memory_utilization_data[date]
+        else:
+            memory_utilization = None
+
+        data.append([host_name, date, cpu_utilization, memory_utilization])
+
+# Create pandas DataFrame
+df = pd.DataFrame(data, columns=["Host", "Date", "CPU Utilization", "Memory Utilization"])
+
+# Export data to Excel
+df.to_excel(f"report_{HOST_GROUP_NAME}_Month_{MONTH}.xlsx", index=False)
+
+print(f"Report generated successfully and saved as 'report_{HOST_GROUP_NAME}_Month_{
