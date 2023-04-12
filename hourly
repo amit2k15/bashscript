@@ -1,0 +1,62 @@
+import pandas as pd
+import mysql.connector
+from mysql.connector import Error
+from datetime import datetime, timedelta
+import xlsxwriter
+
+# Define the Zabbix item key and the date for the report
+item_key = 'your_item_key_here'
+date = '2023-04-11' # Specify the date in YYYY-MM-DD format
+
+# Connect to the MySQL Zabbix database
+try:
+    connection = mysql.connector.connect(
+        host='your_mysql_host_here',
+        user='your_mysql_user_here',
+        password='your_mysql_password_here',
+        database='your_zabbix_database_name_here'
+    )
+    if connection.is_connected():
+        print('Connected to MySQL database')
+
+        # Create a cursor to interact with the database
+        cursor = connection.cursor()
+
+        # Retrieve data from the Zabbix database
+        query = f"SELECT clock, value FROM history WHERE itemid IN (SELECT itemid FROM items WHERE key_ = '{item_key}') AND clock BETWEEN UNIX_TIMESTAMP('{date} 00:00:00') AND UNIX_TIMESTAMP('{date} 23:59:59') ORDER BY clock"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        # Convert the retrieved data into a Pandas DataFrame
+        df = pd.DataFrame(rows, columns=['Timestamp', 'Value'])
+        df['Timestamp'] = pd.to_datetime(df['Timestamp'], unit='s') # Convert timestamp to datetime
+
+        # Group the data by hour and calculate the average value for each hour
+        df['Hour'] = df['Timestamp'].dt.hour
+        hourly_data = df.groupby('Hour').mean()
+
+        # Create an Excel workbook and worksheet
+        workbook = xlsxwriter.Workbook('hourly_report.xlsx')
+        worksheet = workbook.add_worksheet()
+
+        # Write the data to the worksheet
+        worksheet.write(0, 0, 'Hour')
+        worksheet.write(0, 1, 'Average Value')
+        for i, (hour, value) in enumerate(hourly_data.iterrows()):
+            worksheet.write(i+1, 0, hour)
+            worksheet.write(i+1, 1, value['Value'])
+
+        # Close the workbook
+        workbook.close()
+
+        print(f'Hourly report generated as "hourly_report.xlsx"')
+    else:
+        print('Failed to connect to MySQL database')
+except Error as e:
+    print(f'Error: {e}')
+finally:
+    # Close the database connection
+    if connection.is_connected():
+        cursor.close()
+        connection.close()
+        print('MySQL database connection closed')
