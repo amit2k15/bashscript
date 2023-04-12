@@ -1,0 +1,56 @@
+import pandas as pd
+import xlsxwriter
+from pyzabbix import ZabbixAPI
+
+# Zabbix API credentials
+ZABBIX_URL = 'http://your_zabbix_url/api_jsonrpc.php'
+ZABBIX_USER = 'your_username'
+ZABBIX_PASSWORD = 'your_password'
+
+# Zabbix hostgroup and time period
+HOSTGROUP_NAME = 'your_hostgroup_name'
+MONTH = '04'  # Month as two-digit string format (e.g., '04' for April)
+
+# Connect to Zabbix API
+zabbix = ZabbixAPI(ZABBIX_URL)
+zabbix.login(ZABBIX_USER, ZABBIX_PASSWORD)
+
+# Get hosts in the specified hostgroup
+hostgroup = zabbix.hostgroup.get(filter={'name': HOSTGROUP_NAME}, output='extend')[0]
+hostgroup_id = hostgroup['groupid']
+hosts = zabbix.host.get(groupids=[hostgroup_id], output='extend')
+
+# Create Excel workbook and sheets
+workbook = xlsxwriter.Workbook('zabbix_report.xlsx')
+date_format = workbook.add_format({'num_format': 'dd-mm-yyyy'})
+for host in hosts:
+    host_name = host['host']
+    sheet_name = host_name.replace('.', '_')  # Replace '.' with '_' in host name for sheet name
+    worksheet = workbook.add_worksheet(sheet_name)
+    worksheet.write('A1', 'Date', bold=True)
+    worksheet.write('B1', 'CPU Utilization (%)', bold=True)
+    worksheet.write('C1', 'Memory Utilization (%)', bold=True)
+
+    # Get history data for CPU and memory utilization for the specified month
+    history_cpu = zabbix.history.get(hostids=[host['hostid']], itemids=[10084], history=0, 
+                                     sortfield='clock', sortorder='ASC', 
+                                     time_from=f'01-{MONTH}-2023', time_till=f'01-{MONTH}-2023')
+    history_memory = zabbix.history.get(hostids=[host['hostid']], itemids=[10047], history=0, 
+                                        sortfield='clock', sortorder='ASC', 
+                                        time_from=f'01-{MONTH}-2023', time_till=f'01-{MONTH}-2023')
+
+    # Write history data to Excel worksheet
+    row = 1
+    for cpu, memory in zip(history_cpu, history_memory):
+        date = pd.Timestamp.fromtimestamp(int(cpu['clock'])).strftime('%d-%m-%Y')
+        cpu_utilization = float(cpu['value'])
+        memory_utilization = float(memory['value'])
+        worksheet.write(row, 0, date, date_format)
+        worksheet.write(row, 1, cpu_utilization)
+        worksheet.write(row, 2, memory_utilization)
+        row += 1
+
+# Close Excel workbook
+workbook.close()
+
+print('Report generated successfully!')
