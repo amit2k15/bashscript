@@ -1,0 +1,91 @@
+import pymysql
+import pandas as pd
+import xlsxwriter
+
+# MySQL Database Connection Settings
+MYSQL_HOST = 'localhost'
+MYSQL_PORT = 3306
+MYSQL_USER = 'zabbix'
+MYSQL_PASSWORD = 'password'
+MYSQL_DB = 'zabbix'
+
+# Host Group and Month to Generate Report For
+HOST_GROUP = 'Your_Host_Group_Name'
+MONTH = '04'  # Specify the month as a 2-digit string (e.g., '04' for April)
+
+# Connect to MySQL Database
+conn = pymysql.connect(
+    host=MYSQL_HOST,
+    port=MYSQL_PORT,
+    user=MYSQL_USER,
+    password=MYSQL_PASSWORD,
+    db=MYSQL_DB
+)
+
+# Query to Get Hosts in the Host Group
+query = '''
+    SELECT h.hostid, h.host
+    FROM hosts h
+    JOIN hosts_groups hg ON h.hostid = hg.hostid
+    JOIN groups g ON hg.groupid = g.groupid
+    WHERE g.name = %s
+'''
+params = [HOST_GROUP]
+df_hosts = pd.read_sql(query, conn, params=params)
+
+# Create Excel Workbook
+workbook = xlsxwriter.Workbook(f'{HOST_GROUP}_Report_{MONTH}.xlsx')
+
+for _, host in df_hosts.iterrows():
+    host_id = host['hostid']
+    host_name = host['host']
+
+    # Query to Get CPU Utilization for the Host in the Specified Month
+    query_cpu = '''
+        SELECT date_format(FROM_UNIXTIME(clock), '%%Y-%%m-%%d') AS date,
+               avg(value) AS cpu_utilization
+        FROM trends
+        WHERE itemid IN (
+            SELECT itemid
+            FROM items
+            WHERE hostid = %s
+              AND key_ LIKE 'system.cpu.util[,%%]'
+        )
+          AND date_format(FROM_UNIXTIME(clock), '%%m') = %s
+        GROUP BY date
+        ORDER BY date
+    '''
+    params_cpu = [host_id, MONTH]
+    df_cpu = pd.read_sql(query_cpu, conn, params=params_cpu)
+
+    # Query to Get Memory Utilization for the Host in the Specified Month
+    query_memory = '''
+        SELECT date_format(FROM_UNIXTIME(clock), '%%Y-%%m-%%d') AS date,
+               avg(value) AS memory_utilization
+        FROM trends
+        WHERE itemid IN (
+            SELECT itemid
+            FROM items
+            WHERE hostid = %s
+              AND key_ = 'vm.memory.size[used]'
+        )
+          AND date_format(FROM_UNIXTIME(clock), '%%m') = %s
+        GROUP BY date
+        ORDER BY date
+    '''
+    params_memory = [host_id, MONTH]
+    df_memory = pd.read_sql(query_memory, conn, params=params_memory)
+
+    # Create a New Sheet for the Host
+    worksheet = workbook.add_worksheet(host_name)
+
+    # Write Data to the Sheet
+    worksheet.write_row(0, 0, ['Date', 'CPU Utilization', 'Memory Utilization'])
+    for i, (_, row) in enumerate(pd.merge(df_cpu, df_memory, on='date').iterrows(), start=1):
+        worksheet.write_row(i, 0, [row['date'], row['cpu_utilization'], row['memory_utilization']])
+
+# Close the Database Connection and Save the Excel Workbook
+conn.close()
+workbook.close()
+
+print(f'Report for Host Group "{HOST_GROUP}" and Month "{MONTH}"
