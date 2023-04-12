@@ -1,0 +1,72 @@
+import openpyxl
+from openpyxl.styles import Alignment
+from pyzabbix import ZabbixAPI
+
+# Zabbix API credentials
+zabbix_url = 'https://<zabbix_url>/api_jsonrpc.php'
+zabbix_user = '<zabbix_username>'
+zabbix_password = '<zabbix_password>'
+
+# Host group and time period for the report
+host_group = '<host_group_name>'
+month = '<month_name>'
+
+# Connect to Zabbix API
+zabbix_api = ZabbixAPI(zabbix_url)
+zabbix_api.login(user=zabbix_user, password=zabbix_password)
+
+# Get hosts in the host group
+host_group_id = zabbix_api.hostgroup.get(filter={"name": host_group})[0]['groupid']
+hosts = zabbix_api.host.get(groupids=[host_group_id], output='extend')
+
+# Create a new Excel workbook
+workbook = openpyxl.Workbook()
+
+# Loop through hosts and create separate sheets for each host
+for host in hosts:
+    host_name = host['host']
+    sheet_name = host_name
+    sheet = workbook.create_sheet(title=sheet_name)
+
+    # Write column headers
+    sheet['A1'] = 'Date'
+    sheet['B1'] = 'CPU Utilization (%)'
+    sheet['C1'] = 'Memory Utilization (%)'
+
+    # Get host ID
+    host_id = host['hostid']
+
+    # Get historical data for CPU utilization and memory utilization
+    items = zabbix_api.item.get(filter={"hostid": host_id, "name": "CPU Utilization, %;Memory Utilization, %"}, output='extend')
+    item_ids = [item['itemid'] for item in items]
+
+    # Get historical data for each item and write to Excel sheet
+    for item_id in item_ids:
+        # Get historical data
+        history = zabbix_api.history.get(itemids=[item_id], time_from='1-{0}'.format(month), time_till='1-{0}'.format(month), output='extend')
+
+        # Write historical data to Excel sheet
+        row = 2
+        for item in history:
+            date = item['clock']
+            value = item['value']
+
+            # Write date and value to Excel sheet
+            sheet['A{0}'.format(row)] = date
+            sheet['B{0}'.format(row)] = value
+
+            # Increment row counter
+            row += 1
+
+    # Set column width and text alignment
+    sheet.column_dimensions['A'].width = 20
+    sheet.column_dimensions['B'].width = 20
+    sheet.column_dimensions['C'].width = 20
+    for row in sheet.iter_rows(min_row=1, max_row=row-1, min_col=1, max_col=3):
+        for cell in row:
+            cell.alignment = Alignment(horizontal='center')
+
+# Save Excel workbook
+workbook.save('zabbix_report.xlsx')
+
+print('Report generated successfully and saved as zabbix_report.xlsx')
