@@ -1,0 +1,35 @@
+import mysql.connector
+import pandas as pd
+
+# Connect to MySQL database
+conn = mysql.connector.connect(
+    host="your_host",
+    user="your_user",
+    password="your_password",
+    database="your_database"
+)
+
+# Specify the Zabbix item key and date range for the report
+item_key = "your_item_key"
+start_date = "2023-04-12 06:00:00"
+end_date = "2023-04-12 18:00:00"
+
+# Generate query to fetch data from Zabbix database
+query = f"SELECT clock AS 'Date/Time', value AS 'Value' FROM history WHERE itemid IN (SELECT itemid FROM items WHERE key_ = '{item_key}') AND clock >= UNIX_TIMESTAMP('{start_date}') AND clock <= UNIX_TIMESTAMP('{end_date}') ORDER BY clock"
+
+# Fetch data from MySQL database
+df = pd.read_sql_query(query, conn)
+
+# Convert UNIX timestamps to datetime objects
+df['Date/Time'] = pd.to_datetime(df['Date/Time'], unit='s')
+
+# Pivot data to generate hourly report
+df_pivot = df.pivot(index='Date/Time', columns='Value', values='Value')
+
+# Export data to Excel
+df_pivot.to_excel('report.xlsx')
+
+# Close database connection
+conn.close()
+
+print("Report generated successfully!")
