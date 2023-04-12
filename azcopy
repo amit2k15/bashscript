@@ -1,0 +1,110 @@
+#!/bin/bash
+
+# Check if AzCopy is installed
+if ! command -v azcopy >/dev/null 2>&1; then
+  echo "AzCopy is not installed. Installing..."
+  # Install AzCopy
+  wget -O azcopy.tar.gz https://aka.ms/downloadazcopylinux64
+  tar -xf azcopy.tar.gz
+  sudo cp ./azcopy_linux_amd64_*/azcopy /usr/bin/
+  rm -rf ./azcopy_linux_amd64_*
+  rm azcopy.tar.gz
+fi
+
+# Download file from Azure file share with SAS token
+echo "Enter the SAS token URL of the Azure file share:"
+read sas_url
+
+echo "Enter the local path where you want to download the file:"
+read local_path
+
+# Use AzCopy to download the file
+azcopy copy "$sas_url" "$local_path" --recursive=true
+
+echo "File downloaded successfully!"
+
+
+#!/bin/bash
+
+# Check if azcopy is installed
+if ! command -v azcopy &> /dev/null; then
+    echo "azcopy is not installed. Installing azcopy..."
+    # Install azcopy
+    wget -O azcopy.tar.gz https://aka.ms/downloadazcopylinux64
+    tar -xf azcopy.tar.gz
+    sudo mv azcopy*/azcopy /usr/local/bin/
+    rm -rf azcopy*
+fi
+
+# Input parameters
+read -p "Enter SAS token: " sas_token
+read -p "Enter file share name: " file_share_name
+read -p "Enter file name: " file_name
+
+# Download file using azcopy
+azcopy copy "https://${file_share_name}.file.core.windows.net/${file_name}?${sas_token}" ./
+
+echo "File has been downloaded successfully!"
+
+
+check_azcopy_installed() {
+    if ! command -v azcopy &> /dev/null; then
+        echo "AzCopy is not installed. Installing AzCopy..."
+        sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+        sudo sh -c 'echo -e "[azure-cli]
+name=Azure CLI
+baseurl=https://packages.microsoft.com/yumrepos/azure-cli
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo'
+        sudo yum install azure-cli -y
+        echo "AzCopy installed successfully."
+    else
+        echo "AzCopy is already installed."
+    fi
+}
+
+
+#!/bin/bash
+
+# Check if AzCopy is installed
+if yum list installed azcopy > /dev/null 2>&1; then
+    echo "AzCopy is already installed."
+else
+    echo "AzCopy is not installed. Installing..."
+    # Install AzCopy using yum
+    yum install -y azcopy
+    echo "AzCopy installation complete."
+fi
+
+
+#!/bin/bash
+
+# Check if azcopy is already installed
+if [ -x "$(command -v azcopy)" ]; then
+  echo "azcopy is already installed."
+  exit 0
+fi
+
+# Check if yum package manager is available
+if [ ! -x "$(command -v yum)" ]; then
+  echo "yum package manager is not available. Please use a RHEL 7 based system."
+  exit 1
+fi
+
+# Install azcopy using yum
+echo "Installing azcopy..."
+sudo yum install -y epel-release
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://packages.microsoft.com/config/rhel/7/prod.repo
+sudo yum install -y azcopy
+
+# Verify installation
+if [ -x "$(command -v azcopy)" ]; then
+  echo "azcopy has been installed successfully."
+else
+  echo "Failed to install azcopy."
+  exit 1
+fi
+
+exit 0
