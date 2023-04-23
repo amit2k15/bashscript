@@ -1,0 +1,7 @@
+Dear [Name],
+
+Thank you for bringing to our attention that you have observed some queries still running from Zabbix, which we have already planned to monitor in Grafana. We appreciate your diligence and efforts to ensure the smooth functioning of our systems.
+
+We would like to clarify that we did not receive any request to stop monitoring in Zabbix. However, we understand that monitoring in both Zabbix and Grafana can lead to redundancy and unnecessary resource usage. Therefore, we will disable the monitoring in Zabbix and update the monitoring configuration in Grafana.
+
+We appreciate your concern and commitment to ensuring the efficient functioning of our systems. Please do not hesitate to reach out to us if you have any further concerns or queries.
