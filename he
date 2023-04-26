@@ -1,7 +1,3 @@
-Dear [Name],
-
-Thank you for bringing to our attention that you have observed some queries still running from Zabbix, which we have already planned to monitor in Grafana. We appreciate your diligence and efforts to ensure the smooth functioning of our systems.
-
-We would like to clarify that we did not receive any request to stop monitoring in Zabbix. However, we understand that monitoring in both Zabbix and Grafana can lead to redundancy and unnecessary resource usage. Therefore, we will disable the monitoring in Zabbix and update the monitoring configuration in Grafana.
-
-We appreciate your concern and commitment to ensuring the efficient functioning of our systems. Please do not hesitate to reach out to us if you have any further concerns or queries.
+Hi Kedar/Chris,
+After consulting with my senior, I need to schedule a meeting to discuss on the below requirements in details and come up with a better approach that aligns with our goals and objectives.
+As of now, we have not been following the incident approach for Grafana. Therefore, I will cancel the raised incident as it is no longer necessary. We will discuss this further during the meeting.
