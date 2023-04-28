@@ -1,7 +1,6 @@
-Hi Shaheed/Edith,
+Hi Srini/Jagesh,
 
-Thank you so much for your tremendous efforts and support in conducting the Phase 1 activity. 
-As suggested, we have pointed our application to the Master node for time being and will wait for your updates on replica servers so that we can replace the Master node with the proxy in the Zabbix configuration. We understand that this process may take some time, but we appreciate your efforts to keep us updated on its progress.
-I would also like to bring to your attention about the data gap for a few servers that we have identified due to the read-only mode while starting the application. Going forward We will ensure to validate the same on production migration to ensure everything is in order.
-Once again, thank you for your support. 
-
+As discussed, Alert and notification has been configured for Jboss log monitoring alerts with the following conditions:
+If there is an entry in the log with the keyword "ERROR" in the last 15 minutes, an alert will be triggered.
+As you stated earlier you need to implement the same monitoring for production servers as well as IKA Application. Kindly provide us the details of production servers so that we can start onboard those monitors in Zabbix.
+Please let us know if you have any questions or concerns about this request. 
