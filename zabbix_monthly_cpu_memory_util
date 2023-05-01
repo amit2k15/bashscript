@@ -1,56 +1,61 @@
 import pandas as pd
-from openpyxl import Workbook
-from pyzabbix import ZabbixAPI
+import pyzabbix
+from datetime import datetime, timedelta
 
-# Zabbix API credentials and settings
-ZABBIX_URL = 'https://your.zabbix.server/api_jsonrpc.php'
-ZABBIX_USER = 'your_zabbix_username'
-ZABBIX_PASSWORD = 'your_zabbix_password'
-ZABBIX_HOSTGROUP = 'your_host_group_name'
+# Zabbix server credentials
+zabbix_url = 'http://zabbix_server_url/zabbix/api_jsonrpc.php'
+zabbix_user = 'username'
+zabbix_password = 'password'
 
-# Custom time interval (in seconds)
-START_TIME = pd.Timestamp('2023-04-01 00:00:00')
-END_TIME = pd.Timestamp('2023-05-01 00:00:00')
+# Zabbix host group name
+host_group = 'My Host Group'
 
-# Connect to Zabbix API
-zapi = ZabbixAPI(ZABBIX_URL)
-zapi.login(ZABBIX_USER, ZABBIX_PASSWORD)
+# Time interval for data retrieval
+start_time = datetime(2023, 4, 1, 0, 0, 0)
+end_time = datetime(2023, 4, 30, 23, 59, 59)
 
-# Get list of hosts in host group
-hostgroup = zapi.hostgroup.get(filter={'name': ZABBIX_HOSTGROUP})
-hostids = [host['hostid'] for host in hostgroup[0]['hosts']]
+# Connect to the Zabbix server
+zapi = pyzabbix.ZabbixAPI(url=zabbix_url, user=zabbix_user, password=zabbix_password)
 
-# Get CPU and memory data for each host in time range
-items = zapi.item.get(
-    hostids=hostids,
-    search={'key_': ['system.cpu.util', 'vm.memory.util']},
-    output=['name', 'key_', 'lastvalue'],
-    selectHosts=['host'],
-    sortfield='name',
-)
+# Get the hosts in the specified host group
+host_ids = [host['hostid'] for host in zapi.hostgroup.get_hosts(groupids=zapi.hostgroup.get(filter={"name": host_group})[0]['groupid'])]
 
-data = {}
-for item in items:
-    host = item['hosts'][0]['host']
-    key = item['key_']
-    name = item['name']
-    history = zapi.history.get(
-        itemids=item['itemid'],
-        time_from=int(START_TIME.timestamp()),
-        time_till=int(END_TIME.timestamp()),
-        output='extend',
-        history=0,  # use numeric value for "float" history
-    )
-    values = [float(h['value']) for h in history]
-    timestamps = [pd.Timestamp.fromtimestamp(int(h['clock'])) for h in history]
-    df = pd.DataFrame({'Timestamp': timestamps, name: values})
-    if host not in data:
-        data[host] = df
-    else:
-        data[host] = pd.merge(data[host], df, on='Timestamp')
+# Create an Excel file with individual sheets for each host
+writer = pd.ExcelWriter('host_metrics.xlsx', engine='xlsxwriter')
 
-# Create Excel file with individual sheets for each host
-with pd.ExcelWriter('zabbix_data.xlsx') as writer:
-    for host, df in data.items():
-        sheet_name = host.replace('/', '_')[:31]  # limit sheet name length
-        df.to_excel(writer, sheet_name=sheet_name, index=False)
+# Loop through each host and generate the metrics data
+for host_id in host_ids:
+    host_name = zapi.host.get(hostids=host_id)[0]['name']
+
+    # Get the system CPU utilization data
+    cpu_data = zapi.history.get(itemids=zapi.item.get(filter={"hostid": host_id, "name": "system.cpu.util"})[0]['itemid'],
+                                time_from=int(start_time.timestamp()),
+                                time_till=int(end_time.timestamp()),
+                                output='extend',
+                                limit=0)
+
+    # Convert the CPU utilization data to a Pandas DataFrame and resample to day-wise data
+    cpu_df = pd.DataFrame(cpu_data)
+    cpu_df['value'] = cpu_df['value'].astype(float)
+    cpu_df['clock'] = pd.to_datetime(cpu_df['clock'], unit='s')
+    cpu_df = cpu_df.set_index('clock').resample('D').mean()
+
+    # Get the VM memory utilization data
+    mem_data = zapi.history.get(itemids=zapi.item.get(filter={"hostid": host_id, "name": "vm.memory.util"})[0]['itemid'],
+                                time_from=int(start_time.timestamp()),
+                                time_till=int(end_time.timestamp()),
+                                output='extend',
+                                limit=0)
+
+    # Convert the VM memory utilization data to a Pandas DataFrame and resample to day-wise data
+    mem_df = pd.DataFrame(mem_data)
+    mem_df['value'] = mem_df['value'].astype(float)
+    mem_df['clock'] = pd.to_datetime(mem_df['clock'], unit='s')
+    mem_df = mem_df.set_index('clock').resample('D').mean()
+
+    # Write the data to a sheet in the Excel file
+    cpu_df.to_excel(writer, sheet_name=f'{host_name} - CPU')
+    mem_df.to_excel(writer, sheet_name=f'{host_name} - Memory')
+
+# Save the Excel file
+writer.save()
