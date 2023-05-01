@@ -1,51 +1,56 @@
 import pandas as pd
-import requests
-import json
-import time
-import datetime
+from openpyxl import Workbook
 from pyzabbix import ZabbixAPI
 
-# Zabbix server details
-zabbix_server = 'http://<zabbix_server_ip>'
-zabbix_user = '<zabbix_username>'
-zabbix_password = '<zabbix_password>'
+# Zabbix API credentials and settings
+ZABBIX_URL = 'https://your.zabbix.server/api_jsonrpc.php'
+ZABBIX_USER = 'your_zabbix_username'
+ZABBIX_PASSWORD = 'your_zabbix_password'
+ZABBIX_HOSTGROUP = 'your_host_group_name'
 
-# Zabbix API connection
-zapi = ZabbixAPI(zabbix_server)
-zapi.login(zabbix_user, zabbix_password)
+# Custom time interval (in seconds)
+START_TIME = pd.Timestamp('2023-04-01 00:00:00')
+END_TIME = pd.Timestamp('2023-05-01 00:00:00')
 
-# Host group and time range
-host_group_name = '<host_group_name>'
-start_time = datetime.datetime.now() - datetime.timedelta(days=7)
-end_time = datetime.datetime.now()
+# Connect to Zabbix API
+zapi = ZabbixAPI(ZABBIX_URL)
+zapi.login(ZABBIX_USER, ZABBIX_PASSWORD)
 
-# Get host IDs in the host group
-host_group = zapi.hostgroup.get(filter={'name': host_group_name}, output=['groupid'])
-host_group_id = host_group[0]['groupid']
-hosts = zapi.host.get(groupids=host_group_id, output=['hostid', 'host'])
+# Get list of hosts in host group
+hostgroup = zapi.hostgroup.get(filter={'name': ZABBIX_HOSTGROUP})
+hostids = [host['hostid'] for host in hostgroup[0]['hosts']]
 
-# Initialize pandas dataframes
-cpu_df = pd.DataFrame(columns=['host', 'timestamp', 'value'])
-memory_df = pd.DataFrame(columns=['host', 'timestamp', 'value'])
+# Get CPU and memory data for each host in time range
+items = zapi.item.get(
+    hostids=hostids,
+    search={'key_': ['system.cpu.util', 'vm.memory.util']},
+    output=['name', 'key_', 'lastvalue'],
+    selectHosts=['host'],
+    sortfield='name',
+)
 
-# Loop through each host and get CPU and memory data
-for host in hosts:
-    host_id = host['hostid']
-    host_name = host['host']
-    print('Processing host:', host_name)
+data = {}
+for item in items:
+    host = item['hosts'][0]['host']
+    key = item['key_']
+    name = item['name']
+    history = zapi.history.get(
+        itemids=item['itemid'],
+        time_from=int(START_TIME.timestamp()),
+        time_till=int(END_TIME.timestamp()),
+        output='extend',
+        history=0,  # use numeric value for "float" history
+    )
+    values = [float(h['value']) for h in history]
+    timestamps = [pd.Timestamp.fromtimestamp(int(h['clock'])) for h in history]
+    df = pd.DataFrame({'Timestamp': timestamps, name: values})
+    if host not in data:
+        data[host] = df
+    else:
+        data[host] = pd.merge(data[host], df, on='Timestamp')
 
-    # Get CPU data
-    cpu_data = zapi.history.get(itemids=[23368], hostids=host_id, history=0, time_from=int(time.mktime(start_time.timetuple())), time_till=int(time.mktime(end_time.timetuple())), output=['clock', 'value'])
-    for data in cpu_data:
-        cpu_df = cpu_df.append({'host': host_name, 'timestamp': datetime.datetime.fromtimestamp(int(data['clock'])).strftime('%Y-%m-%d %H:%M:%S'), 'value': data['value']}, ignore_index=True)
-
-    # Get memory data
-    memory_data = zapi.history.get(itemids=[23375], hostids=host_id, history=0, time_from=int(time.mktime(start_time.timetuple())), time_till=int(time.mktime(end_time.timetuple())), output=['clock', 'value'])
-    for data in memory_data:
-        memory_df = memory_df.append({'host': host_name, 'timestamp': datetime.datetime.fromtimestamp(int(data['clock'])).strftime('%Y-%m-%d %H:%M:%S'), 'value': data['value']}, ignore_index=True)
-
-# Write data to separate sheets in an Excel file
-writer = pd.ExcelWriter('zabbix_data.xlsx', engine='xlsxwriter')
-cpu_df.to_excel(writer, sheet_name='CPU')
-memory_df.to_excel(writer, sheet_name='Memory')
-writer.save()
+# Create Excel file with individual sheets for each host
+with pd.ExcelWriter('zabbix_data.xlsx') as writer:
+    for host, df in data.items():
+        sheet_name = host.replace('/', '_')[:31]  # limit sheet name length
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
