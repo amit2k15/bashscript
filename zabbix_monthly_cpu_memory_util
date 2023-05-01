@@ -1,39 +1,85 @@
-import pandas as pd
-from zabbix.api import ZabbixAPI
+import requests
+import json
+import openpyxl
+from datetime import datetime, timedelta
 
-# Connect to the Zabbix API
-zabbix_url = 'http://zabbix_server_ip/zabbix'
-zabbix_user = 'username'
-zabbix_password = 'password'
-zapi = ZabbixAPI(url=zabbix_url, user=zabbix_user, password=zabbix_password)
+# Zabbix API credentials
+zabbix_url = 'http://your-zabbix-server.com/api_jsonrpc.php'
+zabbix_user = 'your-zabbix-api-user'
+zabbix_password = 'your-zabbix-api-password'
 
-# Specify the Zabbix host group and time interval
-hostgroup_name = 'My Host Group'
-time_from = '2022-01-01 00:00:00'
-time_till = '2022-01-07 23:59:59'
+# Zabbix host group name
+host_group = 'your-zabbix-host-group'
 
-# Retrieve the host IDs and names for the specified host group
-hostgroup = zapi.hostgroup.get(filter={'name': hostgroup_name}, selectHosts='extend')[0]
-host_ids = [h['hostid'] for h in hostgroup['hosts']]
-host_names = [h['name'] for h in hostgroup['hosts']]
+# Time interval for data retrieval
+start_time = '2022-01-01 00:00:00'
+end_time = '2022-01-31 23:59:59'
 
-# Retrieve the CPU and memory utilization data for each host
-data_frames = []
-for host_id, host_name in zip(host_ids, host_names):
-    cpu_util = zapi.history.get(itemids=zapi.item.get(filter={'hostid': host_id, 'key_': 'system.cpu.util'})[0]['itemid'],
-                                time_from=time_from, time_till=time_till, output='extend')
-    mem_util = zapi.history.get(itemids=zapi.item.get(filter={'hostid': host_id, 'key_': 'vm.memory.util'})[0]['itemid'],
-                                time_from=time_from, time_till=time_till, output='extend')
-    cpu_util_df = pd.DataFrame(cpu_util)
-    mem_util_df = pd.DataFrame(mem_util)
-    cpu_util_df['clock'] = pd.to_datetime(cpu_util_df['clock'], unit='s')
-    mem_util_df['clock'] = pd.to_datetime(mem_util_df['clock'], unit='s')
-    cpu_util_df = cpu_util_df.set_index('clock')
-    mem_util_df = mem_util_df.set_index('clock')
-    data_frames.append((host_name, cpu_util_df, mem_util_df))
+# Zabbix API authentication
+auth_payload = {
+    'jsonrpc': '2.0',
+    'method': 'user.login',
+    'params': {
+        'user': zabbix_user,
+        'password': zabbix_password
+    },
+    'id': 1
+}
+auth_request = requests.post(zabbix_url, data=json.dumps(auth_payload))
+auth_response = auth_request.json()
+auth_token = auth_response['result']
 
-# Write the data to an Excel file with individual sheets
-with pd.ExcelWriter('utilization_data.xlsx') as writer:
-    for host_name, cpu_util_df, mem_util_df in data_frames:
-        cpu_util_df.to_excel(writer, sheet_name=f'{host_name} CPU')
-        mem_util_df.to_excel(writer, sheet_name=f'{host_name} Memory')
+# Retrieve host IDs from host group
+host_payload = {
+    'jsonrpc': '2.0',
+    'method': 'hostgroup.get',
+    'params': {
+        'output': 'extend',
+        'filter': {
+            'name': [host_group]
+        },
+        'selectHosts': ['hostid']
+    },
+    'auth': auth_token,
+    'id': 2
+}
+host_request = requests.post(zabbix_url, data=json.dumps(host_payload))
+host_response = host_request.json()
+host_ids = [host['hosts'][0]['hostid'] for host in host_response['result']]
+
+# Retrieve system.cpu.util and vm.memory.util data for each host in host group
+for host_id in host_ids:
+    host_payload = {
+        'jsonrpc': '2.0',
+        'method': 'history.get',
+        'params': {
+            'output': 'extend',
+            'history': [0, 1],
+            'itemids': ['system.cpu.util', 'vm.memory.util'],
+            'hostids': [host_id],
+            'time_from': datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S').timestamp(),
+            'time_till': datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S').timestamp(),
+            'sortfield': 'clock',
+            'sortorder': 'ASC'
+        },
+        'auth': auth_token,
+        'id': 3
+    }
+    host_request = requests.post(zabbix_url, data=json.dumps(host_payload))
+    host_response = host_request.json()
+    
+    # Create Excel workbook and worksheet for host
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = host_id
+    
+    # Write data to Excel worksheet
+    for history in host_response['result']:
+        timestamp = datetime.fromtimestamp(int(history['clock'])).strftime('%Y-%m-%d')
+        cpu_util = history['value'] if history['itemid'] == 'system.cpu.util' else None
+        memory_util = history['value'] if history['itemid'] == 'vm.memory.util' else None
+        if cpu_util or memory_util:
+            ws.append([timestamp, cpu_util, memory_util])
+    
+    # Save Excel workbook
+    wb.save(f'{host_id}.xlsx')
