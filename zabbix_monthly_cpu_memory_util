@@ -1,61 +1,51 @@
 import pandas as pd
-import pyzabbix
-import xlsxwriter
+import requests
+import json
+import time
+import datetime
+from pyzabbix import ZabbixAPI
 
 # Zabbix server details
-zabbix_url = 'http://zabbix.example.com'
-zabbix_username = 'admin'
-zabbix_password = 'password'
+zabbix_server = 'http://<zabbix_server_ip>'
+zabbix_user = '<zabbix_username>'
+zabbix_password = '<zabbix_password>'
 
-# Zabbix host group and time interval
-hostgroup_name = 'My Host Group'
-time_from = '2023-04-01 00:00:00'
-time_till = '2023-04-30 23:59:59'
+# Zabbix API connection
+zapi = ZabbixAPI(zabbix_server)
+zapi.login(zabbix_user, zabbix_password)
 
-# Connect to Zabbix API
-zabbix_api = pyzabbix.ZabbixAPI(url=zabbix_url, user=zabbix_username, password=zabbix_password)
+# Host group and time range
+host_group_name = '<host_group_name>'
+start_time = datetime.datetime.now() - datetime.timedelta(days=7)
+end_time = datetime.datetime.now()
 
-# Get hosts in the specified host group
-hostgroup = zabbix_api.hostgroup.get(filter={"name": hostgroup_name}, selectHosts="extend")[0]
-hosts = hostgroup['hosts']
+# Get host IDs in the host group
+host_group = zapi.hostgroup.get(filter={'name': host_group_name}, output=['groupid'])
+host_group_id = host_group[0]['groupid']
+hosts = zapi.host.get(groupids=host_group_id, output=['hostid', 'host'])
 
-# Create a new Excel workbook
-workbook = xlsxwriter.Workbook('zabbix_data.xlsx')
+# Initialize pandas dataframes
+cpu_df = pd.DataFrame(columns=['host', 'timestamp', 'value'])
+memory_df = pd.DataFrame(columns=['host', 'timestamp', 'value'])
 
-# Loop through hosts and generate data for each host
+# Loop through each host and get CPU and memory data
 for host in hosts:
-    # Get CPU and memory data for the host
-    cpu_data = zabbix_api.history.get(itemids=[10123], hostids=[host['hostid']], time_from=time_from, time_till=time_till, output='extend')
-    memory_data = zabbix_api.history.get(itemids=[10234], hostids=[host['hostid']], time_from=time_from, time_till=time_till, output='extend')
+    host_id = host['hostid']
+    host_name = host['host']
+    print('Processing host:', host_name)
 
-    # Create a new worksheet for the host
-    worksheet_name = host['name']
-    worksheet = workbook.add_worksheet(worksheet_name)
+    # Get CPU data
+    cpu_data = zapi.history.get(itemids=[23368], hostids=host_id, history=0, time_from=int(time.mktime(start_time.timetuple())), time_till=int(time.mktime(end_time.timetuple())), output=['clock', 'value'])
+    for data in cpu_data:
+        cpu_df = cpu_df.append({'host': host_name, 'timestamp': datetime.datetime.fromtimestamp(int(data['clock'])).strftime('%Y-%m-%d %H:%M:%S'), 'value': data['value']}, ignore_index=True)
 
-    # Convert CPU and memory data to Pandas DataFrame
-    cpu_df = pd.DataFrame(cpu_data)
-    memory_df = pd.DataFrame(memory_data)
+    # Get memory data
+    memory_data = zapi.history.get(itemids=[23375], hostids=host_id, history=0, time_from=int(time.mktime(start_time.timetuple())), time_till=int(time.mktime(end_time.timetuple())), output=['clock', 'value'])
+    for data in memory_data:
+        memory_df = memory_df.append({'host': host_name, 'timestamp': datetime.datetime.fromtimestamp(int(data['clock'])).strftime('%Y-%m-%d %H:%M:%S'), 'value': data['value']}, ignore_index=True)
 
-    # Convert timestamp to datetime and set as index
-    cpu_df['timestamp'] = pd.to_datetime(cpu_df['clock'], unit='s')
-    cpu_df.set_index('timestamp', inplace=True)
-    memory_df['timestamp'] = pd.to_datetime(memory_df['clock'], unit='s')
-    memory_df.set_index('timestamp', inplace=True)
-
-    # Resample data to daily average
-    cpu_daily = cpu_df.resample('D').mean()
-    memory_daily = memory_df.resample('D').mean()
-
-    # Write CPU and memory data to worksheet
-    worksheet.write('A1', 'Date')
-    worksheet.write('B1', 'CPU Utilization')
-    worksheet.write('C1', 'Memory Utilization')
-    row = 1
-    for date, cpu_util, memory_util in zip(cpu_daily.index, cpu_daily['value'], memory_daily['value']):
-        worksheet.write(row, 0, date.date())
-        worksheet.write(row, 1, cpu_util)
-        worksheet.write(row, 2, memory_util)
-        row += 1
-
-# Close workbook
-workbook.close()
+# Write data to separate sheets in an Excel file
+writer = pd.ExcelWriter('zabbix_data.xlsx', engine='xlsxwriter')
+cpu_df.to_excel(writer, sheet_name='CPU')
+memory_df.to_excel(writer, sheet_name='Memory')
+writer.save()
