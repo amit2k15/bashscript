@@ -1,35 +1,41 @@
-import pyzabbix
-import pandas as pd
+import openpyxl
+from pyzabbix import ZabbixAPI
+import time
 
-# Specify Zabbix server details
-zabbix_server = 'https://your_zabbix_server.com'
-username = 'your_zabbix_username'
-password = 'your_zabbix_password'
+# Zabbix API credentials
+zabbix_server = 'https://your.zabbix.server.com/'
+zabbix_user = 'your_zabbix_user'
+zabbix_password = 'your_zabbix_password'
 
-# Specify the Zabbix host group and time interval
-host_group_name = 'Your Host Group Name'
-time_from = '2023-04-01 00:00:00'
-time_till = '2023-04-30 23:59:59'
+# Zabbix host group and time interval
+host_group = 'your_host_group_name'
+from_time = int(time.mktime(time.strptime('2023-04-01 00:00:00', '%Y-%m-%d %H:%M:%S')))
+to_time = int(time.mktime(time.strptime('2023-04-30 23:59:59', '%Y-%m-%d %H:%M:%S')))
 
-# Connect to the Zabbix server
-zapi = pyzabbix.ZabbixAPI(zabbix_server)
-zapi.login(username, password)
+# Connect to Zabbix API
+zabbix = ZabbixAPI(zabbix_server)
+zabbix.login(zabbix_user, zabbix_password)
 
-# Get the hosts in the specified host group
-host_group = zapi.hostgroup.get(filter={'name': host_group_name}, selectHosts='extend')
-hosts = [host['hosts'][0]['host'] for host in host_group]
+# Get hosts in host group
+hosts = zabbix.host.get(groupids=zabbix.hostgroup.get(filter={"name": host_group})[0]['groupid'], output='extend')
 
-# Loop through the hosts and get the CPU and memory data for each host
+# Create Excel workbook and worksheets
+wb = openpyxl.Workbook()
 for host in hosts:
-    # Get the CPU and memory utilization data
-    cpu_util = zapi.history.get(item='system.cpu.util[,idle]', host=host, time_from=time_from, time_till=time_till)
-    mem_util = zapi.history.get(item='vm.memory.util[available]', host=host, time_from=time_from, time_till=time_till)
+    ws = wb.create_sheet(title=host['name'])
 
-    # Convert the data to a pandas DataFrame
-    cpu_util_df = pd.DataFrame(cpu_util)
-    mem_util_df = pd.DataFrame(mem_util)
+    # Get CPU and memory utilization data for host
+    cpu_util_data = zabbix.history.get(itemids=zabbix.item.get(hostids=host['hostid'], search={'key_': 'system.cpu.util'})[0]['itemid'], time_from=from_time, time_till=to_time, output='extend')
+    memory_util_data = zabbix.history.get(itemids=zabbix.item.get(hostids=host['hostid'], search={'key_': 'vm.memory.util'})[0]['itemid'], time_from=from_time, time_till=to_time, output='extend')
 
-    # Create a new Excel sheet for each host and write the data to the sheet
-    with pd.ExcelWriter(f'{host}.xlsx') as writer:
-        cpu_util_df.to_excel(writer, sheet_name='CPU Utilization', index=False)
-        mem_util_df.to_excel(writer, sheet_name='Memory Utilization', index=False)
+    # Write utilization data to worksheet
+    ws.cell(row=1, column=1, value='Timestamp')
+    ws.cell(row=1, column=2, value='CPU Utilization (%)')
+    ws.cell(row=1, column=3, value='Memory Utilization (%)')
+    for i in range(len(cpu_util_data)):
+        ws.cell(row=i+2, column=1, value=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(cpu_util_data[i]['clock']))))
+        ws.cell(row=i+2, column=2, value=cpu_util_data[i]['value'])
+        ws.cell(row=i+2, column=3, value=memory_util_data[i]['value'])
+
+# Save Excel workbook
+wb.save('utilization_data.xlsx')
