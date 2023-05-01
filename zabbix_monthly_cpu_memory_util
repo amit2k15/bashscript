@@ -1,0 +1,57 @@
+import openpyxl
+from pyzabbix import ZabbixAPI
+
+# Zabbix API credentials
+zabbix_url = 'https://zabbix.example.com/zabbix'
+zabbix_user = 'username'
+zabbix_password = 'password'
+
+# Host group name and time interval
+host_group_name = 'MyHostGroup'
+time_from = '2022-01-01 00:00:00'
+time_till = '2022-01-31 23:59:59'
+
+# Initialize Zabbix API object
+zapi = ZabbixAPI(zabbix_url)
+zapi.login(zabbix_user, zabbix_password)
+
+# Get host group ID
+host_group = zapi.hostgroup.get(filter={'name': host_group_name})
+if not host_group:
+    print(f'Error: Host group {host_group_name} not found')
+    exit()
+host_group_id = host_group[0]['groupid']
+
+# Get hosts in host group
+hosts = zapi.host.get(groupids=[host_group_id])
+if not hosts:
+    print(f'Error: No hosts found in {host_group_name} group')
+    exit()
+
+# Create Excel workbook
+workbook = openpyxl.Workbook()
+
+# Retrieve metrics for each host
+for host in hosts:
+    # Get host metrics
+    metrics = zapi.item.get(hostids=[host['hostid']],
+                            search={'key_': ['system.cpu.util', 'vm.memory.util']},
+                            output=['name', 'key_', 'lastvalue'],
+                            expandData=True,
+                            time_from=time_from,
+                            time_till=time_till)
+
+    # Create new worksheet for host
+    worksheet = workbook.create_sheet(title=host['name'])
+
+    # Write metric data to worksheet
+    for metric in metrics:
+        if metric['lastvalue'] is None:
+            continue
+        if 'system.cpu.util' in metric['key_']:
+            worksheet.append(['CPU Utilization', metric['lastvalue']])
+        elif 'vm.memory.util' in metric['key_']:
+            worksheet.append(['Memory Utilization', metric['lastvalue']])
+
+# Save Excel workbook
+workbook.save('metrics.xlsx')
