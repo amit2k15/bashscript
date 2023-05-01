@@ -1,57 +1,35 @@
-import openpyxl
-from pyzabbix import ZabbixAPI
+import pyzabbix
+import pandas as pd
 
-# Zabbix API credentials
-zabbix_url = 'https://zabbix.example.com/zabbix'
-zabbix_user = 'username'
-zabbix_password = 'password'
+# Specify Zabbix server details
+zabbix_server = 'https://your_zabbix_server.com'
+username = 'your_zabbix_username'
+password = 'your_zabbix_password'
 
-# Host group name and time interval
-host_group_name = 'MyHostGroup'
-time_from = '2022-01-01 00:00:00'
-time_till = '2022-01-31 23:59:59'
+# Specify the Zabbix host group and time interval
+host_group_name = 'Your Host Group Name'
+time_from = '2023-04-01 00:00:00'
+time_till = '2023-04-30 23:59:59'
 
-# Initialize Zabbix API object
-zapi = ZabbixAPI(zabbix_url)
-zapi.login(zabbix_user, zabbix_password)
+# Connect to the Zabbix server
+zapi = pyzabbix.ZabbixAPI(zabbix_server)
+zapi.login(username, password)
 
-# Get host group ID
-host_group = zapi.hostgroup.get(filter={'name': host_group_name})
-if not host_group:
-    print(f'Error: Host group {host_group_name} not found')
-    exit()
-host_group_id = host_group[0]['groupid']
+# Get the hosts in the specified host group
+host_group = zapi.hostgroup.get(filter={'name': host_group_name}, selectHosts='extend')
+hosts = [host['hosts'][0]['host'] for host in host_group]
 
-# Get hosts in host group
-hosts = zapi.host.get(groupids=[host_group_id])
-if not hosts:
-    print(f'Error: No hosts found in {host_group_name} group')
-    exit()
-
-# Create Excel workbook
-workbook = openpyxl.Workbook()
-
-# Retrieve metrics for each host
+# Loop through the hosts and get the CPU and memory data for each host
 for host in hosts:
-    # Get host metrics
-    metrics = zapi.item.get(hostids=[host['hostid']],
-                            search={'key_': ['system.cpu.util', 'vm.memory.util']},
-                            output=['name', 'key_', 'lastvalue'],
-                            expandData=True,
-                            time_from=time_from,
-                            time_till=time_till)
+    # Get the CPU and memory utilization data
+    cpu_util = zapi.history.get(item='system.cpu.util[,idle]', host=host, time_from=time_from, time_till=time_till)
+    mem_util = zapi.history.get(item='vm.memory.util[available]', host=host, time_from=time_from, time_till=time_till)
 
-    # Create new worksheet for host
-    worksheet = workbook.create_sheet(title=host['name'])
+    # Convert the data to a pandas DataFrame
+    cpu_util_df = pd.DataFrame(cpu_util)
+    mem_util_df = pd.DataFrame(mem_util)
 
-    # Write metric data to worksheet
-    for metric in metrics:
-        if metric['lastvalue'] is None:
-            continue
-        if 'system.cpu.util' in metric['key_']:
-            worksheet.append(['CPU Utilization', metric['lastvalue']])
-        elif 'vm.memory.util' in metric['key_']:
-            worksheet.append(['Memory Utilization', metric['lastvalue']])
-
-# Save Excel workbook
-workbook.save('metrics.xlsx')
+    # Create a new Excel sheet for each host and write the data to the sheet
+    with pd.ExcelWriter(f'{host}.xlsx') as writer:
+        cpu_util_df.to_excel(writer, sheet_name='CPU Utilization', index=False)
+        mem_util_df.to_excel(writer, sheet_name='Memory Utilization', index=False)
