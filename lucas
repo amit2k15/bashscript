@@ -1,0 +1,11 @@
+Hi Lucas,
+
+I am writing to inform you that I have analyzed the monitor and found that we have 2 different alert conditions for the File System in Zabbix.
+
+The first alert condition is a "Minor" alert which triggers when the utilization of the file system is greater than 85% and less than 95%. The second alert condition is a "Major" alert which triggers when the utilization of the file system is greater than or equal to 95% and if the file system is free less than or equal to 5GB.
+
+I would like to bring to your attention that the Major alert was not triggered for a recent scenario because the free space on the file system was more than 5 GB. This occurred due to the dependency trigger condition that was set.
+
+However, to avoid such scenarios in the future, we have decided to remove the dependency trigger condition. This will ensure that the Major alert is triggered when the utilization of the file system is greater than or equal to 95% irrespective of the free space available.
+
+Please let me know if you have any questions or concerns. Thank you for your attention to this matter.
