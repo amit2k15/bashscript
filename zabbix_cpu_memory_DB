@@ -1,67 +1,63 @@
-import pymysql
-import xlsxwriter
+import mysql.connector
+import pandas as pd
 
-# MySQL database connection details
-MYSQL_HOST = "localhost"
-MYSQL_USER = "user"
-MYSQL_PASSWORD = "password"
-MYSQL_DATABASE = "zabbix"
+# specify the Zabbix database connection details
+zabbix_db = {
+    'host': 'zabbix-server-hostname',
+    'user': 'zabbix-database-username',
+    'password': 'zabbix-database-password',
+    'database': 'zabbix-database-name'
+}
 
-# Zabbix host group name and custom time interval
-HOST_GROUP = "myhostgroup"
-START_TIME = "2023-04-01 00:00:00"
-END_TIME = "2023-04-30 23:59:59"
+# specify the host group name and time interval (in seconds)
+host_group = 'My Host Group'
+interval = 3600
 
-# Excel file name
-EXCEL_FILE = "zabbix_data.xlsx"
+# connect to the Zabbix database
+cnx = mysql.connector.connect(**zabbix_db)
+cursor = cnx.cursor()
 
-# Connect to MySQL database
-db = pymysql.connect(host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE)
+# retrieve the host IDs for the specified host group
+query = """
+SELECT h.hostid
+FROM hosts h
+INNER JOIN hosts_groups hg ON h.hostid = hg.hostid
+INNER JOIN groups g ON hg.groupid = g.groupid
+WHERE g.name = %s
+"""
+cursor.execute(query, (host_group,))
+host_ids = [result[0] for result in cursor.fetchall()]
 
-# Create a cursor object to execute queries
-cursor = db.cursor()
+# retrieve the system CPU utilization and virtual memory utilization data for each host
+query = """
+SELECT h.name, item.name, clock, value_avg
+FROM items item
+INNER JOIN hosts h ON item.hostid = h.hostid
+INNER JOIN history_uint hu ON item.itemid = hu.itemid
+WHERE item.key_ IN ('system.cpu.util[,idle]', 'vm.memory.util[available]')
+AND h.hostid = %s
+AND clock BETWEEN %s AND %s
+ORDER BY h.name, item.name, clock
+"""
+data = []
+for host_id in host_ids:
+    cursor.execute(query, (host_id, int(time.time()) - interval, int(time.time())))
+    for result in cursor.fetchall():
+        data.append({
+            'host': result[0],
+            'metric': result[1],
+            'timestamp': result[2],
+            'value': result[3]
+        })
 
-# Get the Zabbix host IDs and names for the specified host group
-query = "SELECT hosts.hostid, hosts.host FROM hosts \
-         INNER JOIN hosts_groups ON hosts.hostid = hosts_groups.hostid \
-         INNER JOIN groups ON hosts_groups.groupid = groups.groupid \
-         WHERE groups.name = %s"
-cursor.execute(query, (HOST_GROUP,))
-hosts = cursor.fetchall()
+# close the database connection
+cursor.close()
+cnx.close()
 
-# Create an Excel workbook object
-workbook = xlsxwriter.Workbook(EXCEL_FILE)
-
-# Loop through the hosts and create individual sheets for each host
-for host in hosts:
-    host_id = host[0]
-    host_name = host[1]
-    
-    # Get the CPU and memory data for the host for the specified time interval
-    query = "SELECT FROM_UNIXTIME(clock) AS timestamp, AVG(value) \
-             FROM history \
-             WHERE itemid IN (SELECT itemid FROM items WHERE hostid = %s AND (key_ = 'system.cpu.util' OR key_ = 'vm.memory.util')) \
-             AND clock BETWEEN UNIX_TIMESTAMP(%s) AND UNIX_TIMESTAMP(%s) \
-             GROUP BY DATE(FROM_UNIXTIME(clock))"
-    cursor.execute(query, (host_id, START_TIME, END_TIME))
-    data = cursor.fetchall()
-    
-    # Create a new sheet for the host
-    worksheet = workbook.add_worksheet(host_name)
-    
-    # Write the data to the sheet
-    row = 0
-    for item in data:
-        timestamp = item[0]
-        value = item[1]
-        
-        worksheet.write(row, 0, timestamp)
-        worksheet.write(row, 1, value)
-        
-        row += 1
-
-# Close the workbook
-workbook.close()
-
-# Close the database connection
-db.close()
+# create separate sheets for each host in the Excel file
+with pd.ExcelWriter('utilization_data.xlsx') as writer:
+    for host in set([d['host'] for d in data]):
+        host_data = [d for d in data if d['host'] == host]
+        df = pd.DataFrame(host_data)
+        df = df.pivot(index='timestamp', columns='metric', values='value')
+        df.to_excel(writer, sheet_name=host)
