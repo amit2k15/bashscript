@@ -1,0 +1,63 @@
+import pandas as pd
+from sqlalchemy import create_engine
+from pyzabbix import ZabbixAPI
+
+# Zabbix API settings
+zabbix_url = 'http://<zabbix_server>/zabbix'
+zabbix_user = '<username>'
+zabbix_password = '<password>'
+
+# MySQL database settings
+db_host = '<db_host>'
+db_user = '<db_user>'
+db_password = '<db_password>'
+db_name = '<db_name>'
+
+# Host group and time interval settings
+host_group = '<host_group>'
+time_from = '<start_time>'
+time_till = '<end_time>'
+
+# Connect to Zabbix API
+zapi = ZabbixAPI(zabbix_url)
+zapi.login(zabbix_user, zabbix_password)
+
+# Get host group ID
+host_group_obj = zapi.hostgroup.get(filter={'name': host_group})[0]
+host_group_id = host_group_obj['groupid']
+
+# Get host IDs in the host group
+hosts = zapi.host.get(groupids=[host_group_id])
+host_ids = [host['hostid'] for host in hosts]
+
+# Connect to MySQL database
+db_url = f'mysql+pymysql://{db_user}:{db_password}@{db_host}/{db_name}'
+engine = create_engine(db_url)
+
+# Query the MySQL database for system.cpu.util and vm.memory.util data
+query = f"""
+SELECT
+    h.name AS hostname,
+    i.clock AS time,
+    i.value AS value,
+    i.itemid AS itemid,
+    i.name AS itemname
+FROM
+    items i
+    JOIN hosts h ON i.hostid = h.hostid
+WHERE
+    i.hostid IN ({','.join(host_ids)})
+    AND i.name IN ('system.cpu.util', 'vm.memory.util')
+    AND i.type = 0
+    AND i.value_type = 3
+    AND i.clock >= {time_from}
+    AND i.clock <= {time_till}
+"""
+
+df = pd.read_sql_query(query, engine)
+
+# Pivot the data to have one row per host per time
+df_pivot = pd.pivot_table(df, values='value', index=['hostname', 'time'], columns=['itemname'])
+
+# Save the data to an Excel file
+df_pivot.to_excel(f'{host_group}_report.xlsx')
