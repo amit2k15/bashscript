@@ -1,0 +1,67 @@
+import pymysql
+import xlsxwriter
+
+# MySQL database connection details
+MYSQL_HOST = "localhost"
+MYSQL_USER = "user"
+MYSQL_PASSWORD = "password"
+MYSQL_DATABASE = "zabbix"
+
+# Zabbix host group name and custom time interval
+HOST_GROUP = "myhostgroup"
+START_TIME = "2023-04-01 00:00:00"
+END_TIME = "2023-04-30 23:59:59"
+
+# Excel file name
+EXCEL_FILE = "zabbix_data.xlsx"
+
+# Connect to MySQL database
+db = pymysql.connect(host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE)
+
+# Create a cursor object to execute queries
+cursor = db.cursor()
+
+# Get the Zabbix host IDs and names for the specified host group
+query = "SELECT hosts.hostid, hosts.host FROM hosts \
+         INNER JOIN hosts_groups ON hosts.hostid = hosts_groups.hostid \
+         INNER JOIN groups ON hosts_groups.groupid = groups.groupid \
+         WHERE groups.name = %s"
+cursor.execute(query, (HOST_GROUP,))
+hosts = cursor.fetchall()
+
+# Create an Excel workbook object
+workbook = xlsxwriter.Workbook(EXCEL_FILE)
+
+# Loop through the hosts and create individual sheets for each host
+for host in hosts:
+    host_id = host[0]
+    host_name = host[1]
+    
+    # Get the CPU and memory data for the host for the specified time interval
+    query = "SELECT FROM_UNIXTIME(clock) AS timestamp, AVG(value) \
+             FROM history \
+             WHERE itemid IN (SELECT itemid FROM items WHERE hostid = %s AND (key_ = 'system.cpu.util' OR key_ = 'vm.memory.util')) \
+             AND clock BETWEEN UNIX_TIMESTAMP(%s) AND UNIX_TIMESTAMP(%s) \
+             GROUP BY DATE(FROM_UNIXTIME(clock))"
+    cursor.execute(query, (host_id, START_TIME, END_TIME))
+    data = cursor.fetchall()
+    
+    # Create a new sheet for the host
+    worksheet = workbook.add_worksheet(host_name)
+    
+    # Write the data to the sheet
+    row = 0
+    for item in data:
+        timestamp = item[0]
+        value = item[1]
+        
+        worksheet.write(row, 0, timestamp)
+        worksheet.write(row, 1, value)
+        
+        row += 1
+
+# Close the workbook
+workbook.close()
+
+# Close the database connection
+db.close()
