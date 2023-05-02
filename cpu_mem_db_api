@@ -1,0 +1,104 @@
+import openpyxl
+import pymysql.cursors
+import requests
+import json
+import datetime
+
+# Zabbix API details
+zabbix_url = 'https://zabbix.example.com/api_jsonrpc.php'
+zabbix_user = 'your_username'
+zabbix_password = 'your_password'
+
+# MySQL database details
+mysql_host = 'mysql.example.com'
+mysql_user = 'mysql_username'
+mysql_password = 'mysql_password'
+mysql_database = 'zabbix'
+
+# Host group and time interval
+host_group = 'Your Host Group Name'
+start_time = int(datetime.datetime(2022, 1, 1).timestamp())  # Replace with your start time
+end_time = int(datetime.datetime(2022, 1, 31).timestamp())  # Replace with your end time
+
+# Zabbix API login request
+login_data = {
+    'jsonrpc': '2.0',
+    'method': 'user.login',
+    'params': {
+        'user': zabbix_user,
+        'password': zabbix_password
+    },
+    'id': 1
+}
+response = requests.post(zabbix_url, json=login_data)
+auth_token = response.json()['result']
+
+# Zabbix API host group request
+host_group_data = {
+    'jsonrpc': '2.0',
+    'method': 'hostgroup.get',
+    'params': {
+        'output': 'extend',
+        'filter': {
+            'name': host_group
+        }
+    },
+    'auth': auth_token,
+    'id': 1
+}
+response = requests.post(zabbix_url, json=host_group_data)
+host_group_id = response.json()['result'][0]['groupid']
+
+# MySQL database connection
+mysql_connection = pymysql.connect(
+    host=mysql_host,
+    user=mysql_user,
+    password=mysql_password,
+    database=mysql_database,
+    cursorclass=pymysql.cursors.DictCursor
+)
+
+# MySQL query
+query = f"""
+    SELECT
+        h.host AS Hostname,
+        i.name AS ItemName,
+        ROUND(AVG(hd.value), 2) AS Value,
+        DATE_FORMAT(FROM_UNIXTIME(h.clock), '%Y-%m-%d') AS Date
+    FROM
+        hosts h
+        JOIN hosts_groups hg ON h.hostid = hg.hostid
+        JOIN items i ON h.hostid = i.hostid
+        JOIN history_uint hd ON i.itemid = hd.itemid
+    WHERE
+        hg.groupid = {host_group_id}
+        AND i.key_ IN ('system.cpu.util', 'vm.memory.util')
+        AND h.status = 0
+        AND hd.clock >= {start_time}
+        AND hd.clock < {end_time}
+    GROUP BY
+        h.host,
+        i.name,
+        Date
+"""
+
+# Execute MySQL query and fetch results
+with mysql_connection.cursor() as cursor:
+    cursor.execute(query)
+    results = cursor.fetchall()
+
+# Create Excel workbook and worksheet
+workbook = openpyxl.Workbook()
+worksheet = workbook.active
+worksheet.title = 'Report'
+
+# Write column headers
+worksheet.cell(row=1, column=1, value='Hostname')
+worksheet.cell(row=1, column=2, value='Item Name')
+worksheet.cell(row=1, column=3, value='Value')
+worksheet.cell(row=1, column=4, value='Date')
+
+# Write data to worksheet
+for row_num, row_data in enumerate(results, start=2):
+    worksheet.cell(row=row_num, column=1, value=row_data['Hostname'])
+   
