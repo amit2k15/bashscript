@@ -1,0 +1,7 @@
+Hi Sam,
+I wanted to follow up on your query regarding the large number of alerts that you are receiving from Zabbix.  After conducting a thorough analysis, we have identified that you are the SLO for the following applications.
+
+we have found that in Zabbix, there are a total of 5 applications associated with your role as the SLO, while in DT, there are 3 applications. We have noticed that there are more servers identified in Zabbix as compared to DT, and the threshold for alerts is set as follows.
+
+Over the past three months, we have received 27 alerts from Zabbix that belong to your application. However, we have noticed that you received 500 additional alerts from Zabbix as a member of a distribution list (DL), which includes below applications.
+We understand that receiving a high volume of alerts can be overwhelming, so we would like to work with you to optimize your alert configuration. This will help ensure that you receive only the alerts that are most relevant to your responsibilities. Please let us know if you would like to schedule a call to discuss this further.
