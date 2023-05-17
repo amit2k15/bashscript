@@ -5,3 +5,8 @@ curl -X POST \
   
   response=$(curl -s -X POST -u "$client_id:$client_secret" -d "grant_type=client_credentials" "$oauth_url")
 
+if (output) {
+    value = output[0];
+    var macroName = "{$MACRO_NAME}";
+    value = value.replace(macroName, value);
+}
