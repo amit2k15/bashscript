@@ -1,0 +1,4 @@
+curl -X POST \
+  -u "client_id:client_secret" \
+  -d "grant_type=client_credentials" \
+  "https://oauth2.example.com/token"
