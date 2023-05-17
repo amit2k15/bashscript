@@ -10,3 +10,8 @@ if (output) {
     var macroName = "{$MACRO_NAME}";
     value = value.replace(macroName, value);
 }
+
+var macroName = "{$MACRO_NAME}";  // Replace with your desired macro name
+var macroValue = externalCheckOutput;  // Use the captured output from the external check
+
+return macroName + "=" + macroValue;
