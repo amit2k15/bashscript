@@ -1,0 +1,12 @@
+
+Hi Eric,
+
+I hope this email finds you well. I am writing to emphasize the importance of a requested feature that is highly significant for our organization. Currently, both our database team and application team are reluctant to grant access to the MS SQL DB through the Global Service group, instead of creating individual user accounts at the SQL level. Managing numerous individual accounts across multiple SQL servers has proven to be quite challenging.
+
+To address this issue, we conducted a successful proof of concept (POC) by utilizing the SQL Server authentication option for a few databases. Now, our next step is to implement this change at the production level. However, in order to proceed, we require a feature or option in Grafana that allows us to provide a username and password for Windows authentication.
+
+Given the positive outcome of the POC, implementing this feature will streamline our processes and significantly improve the efficiency of managing user accounts across our SQL servers. It is crucial for us to have this functionality in Grafana to ensure smooth operations and enhanced security.
+
+I kindly request your support and assistance in prioritizing the development and implementation of this feature. It would greatly benefit our organization and enable us to seamlessly transition to the recommended approach for accessing the MS SQL DB.
+
+Thank you for your attention to this matter. We appreciate your continued commitment to delivering excellent products and look forward to your positive response.
