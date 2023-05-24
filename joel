@@ -1,6 +1,6 @@
-Hi Joel,
-There is no signficant change in the minor version of Zabbix agents (Ex: v5.0.14, v5.0.34). The newer version of Zabbix is backward compatible with older Zabbix agents. This means that your existing Zabbix agents will continue to function properly even after the upgrade to Zabbix 6.0.
-We have thoroughly tested the compatibility of the older Zabbix agent version with Zabbix 6.0 in our testing environment, and we haven't encountered any major issues or compatibility conflicts. 
-We are currently in the process of upgrading our Zabbix application from version 5.0 LTS  to the latest version, 6.0 LTS and will keep you posted on the same.
-If you have any further questions or require additional information, please feel free to reach us.
+Hi Michael,
 
+I wanted to provide you with an update regarding the DB query issue. After cross-checking with the DB team, we have confirmed that the user has the necessary permissions to access the tables, as we were able to retrieve data from the corresponding tables successfully.
+
+However, it appears that there might be an issue with the query itself, which is causing unexpected results or errors. To further investigate and resolve this matter, I kindly request your availability for a discussion. This will allow us to better understand the problem at hand and work towards a solution.
+Please let me know your preferred time  for the discussion,Thank you for your attention to this matter, and I look forward to speaking with you soon.
