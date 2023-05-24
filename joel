@@ -1,6 +1,12 @@
-Hi Michael,
+#!/bin/bash
 
-I wanted to provide you with an update regarding the DB query issue. After cross-checking with the DB team, we have confirmed that the user has the necessary permissions to access the tables, as we were able to retrieve data from the corresponding tables successfully.
+# Path to the JKS file
+JKS_FILE="/path/to/your/file.jks"
+# Password for the JKS file
+JKS_PASSWORD="your_jks_password"
 
-However, it appears that there might be an issue with the query itself, which is causing unexpected results or errors. To further investigate and resolve this matter, I kindly request your availability for a discussion. This will allow us to better understand the problem at hand and work towards a solution.
-Please let me know your preferred time  for the discussion,Thank you for your attention to this matter, and I look forward to speaking with you soon.
+# Extract the expiry date from the JKS file
+expiry_date=$(keytool -list -v -keystore "$JKS_FILE" -storepass "$JKS_PASSWORD" | awk '/Valid from/ {print $9" "$8" "$7}')
+
+# Output the expiry date
+echo "$expiry_date"
