@@ -1,55 +1,53 @@
-import pyexcel
+import datetime
 from pyzabbix import ZabbixAPI
-from datetime import datetime, timedelta
+from openpyxl import Workbook
 
-# Zabbix API details
-ZABBIX_URL = 'http://your-zabbix-url.com'
-ZABBIX_USERNAME = 'your-username'
-ZABBIX_PASSWORD = 'your-password'
+# Zabbix API credentials and URL
+zabbix_url = 'http://your_zabbix_server/api_jsonrpc.php'
+zabbix_username = 'your_username'
+zabbix_password = 'your_password'
 
-# Host group name and CPU item key
-HOST_GROUP_NAME = 'Your Host Group Name'
-CPU_ITEM_KEY = 'system.cpu.util[,idle]'
-
-# Date range for the report (last week)
-end_date = datetime.now()
-start_date = end_date - timedelta(days=7)
+# Host group name and timeframe for the report
+host_group = 'Your Host Group Name'
+time_period_days = 7
 
 # Connect to Zabbix API
-zabbix = ZabbixAPI(ZABBIX_URL)
-zabbix.login(ZABBIX_USERNAME, ZABBIX_PASSWORD)
+zapi = ZabbixAPI(zabbix_url)
+zapi.login(zabbix_username, zabbix_password)
 
-# Get the host group ID
-host_group = zabbix.hostgroup.get(filter={'name': HOST_GROUP_NAME})
-if not host_group:
-    raise ValueError(f"Host group '{HOST_GROUP_NAME}' not found.")
+# Get host group ID
+host_group_id = zapi.hostgroup.get(filter={'name': host_group})[0]['groupid']
 
-host_group_id = host_group[0]['groupid']
+# Calculate the time range for the last week
+end_time = datetime.datetime.now()
+start_time = end_time - datetime.timedelta(days=time_period_days)
 
-# Get the hosts in the host group
-hosts = zabbix.host.get(groupids=[host_group_id])
-if not hosts:
-    raise ValueError(f"No hosts found in the host group '{HOST_GROUP_NAME}'.")
+# Get CPU utilization data for the specified host group
+items = zapi.item.get(
+    output=['hostid', 'name', 'lastvalue'],
+    groupids=host_group_id,
+    search={'key_': 'system.cpu.util[,avg1]'},
+    selectHosts=['host']
+)
 
-# Fetch CPU utilization data for each host
-report_data = [['Host', 'Timestamp', 'CPU Utilization (%)']]
-for host in hosts:
-    host_id = host['hostid']
-    history = zabbix.history.get(
-        output=['clock', 'value'],
-        itemids=zabbix.item.get(hostids=host_id, search={'key_': CPU_ITEM_KEY})[0]['itemid'],
-        history=0,  # Numeric (float) data type
-        time_from=start_date.timestamp(),
-        time_till=end_date.timestamp(),
-        sortfield='clock',
-        sortorder='ASC',
-    )
+# Create a new Excel workbook
+wb = Workbook()
+ws = wb.active
 
-    for entry in history:
-        timestamp = datetime.fromtimestamp(int(entry['clock']))
-        utilization = float(entry['value'])
-        report_data.append([host['host'], timestamp, utilization])
+# Write headers to the worksheet
+ws.append(['Host', 'CPU Utilization (%)'])
 
-# Save the report as an Excel file
-pyexcel.save_as(array=report_data, dest_file_name='cpu_utilization_report.xlsx')
-print("Report generated successfully.")
+# Iterate over the items and retrieve the average CPU utilization for each host
+for item in items:
+    host = item['hosts'][0]['host']
+    last_value = float(item['lastvalue'])
+    ws.append([host, last_value])
+
+# Save the workbook
+filename = f'CPU_Utilization_Report_{start_time.strftime("%Y-%m-%d")}_to_{end_time.strftime("%Y-%m-%d")}.xlsx'
+wb.save(filename)
+
+print(f'Report saved as "{filename}".')
+
+# Disconnect from Zabbix API
+zapi.logout()
