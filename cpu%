@@ -1,105 +1,38 @@
-import requests
-import openpyxl
-from datetime import datetime, timedelta
+import pyexcel as pe
+from pyzabbix import ZabbixAPI
 
 # Zabbix API configuration
-ZABBIX_API_URL = 'http://your_zabbix_server/api_jsonrpc.php'
-ZABBIX_USERNAME = 'your_username'
+ZABBIX_URL = 'http://your_zabbix_server_url'
+ZABBIX_USER = 'your_username'
 ZABBIX_PASSWORD = 'your_password'
 
-# Excel report configuration
-REPORT_FILE = 'cpu_utilization_report.xlsx'
+# Host group and timeframe configuration
+HOST_GROUP_NAME = 'Your_Host_Group_Name'
+TIME_RANGE = 604800  # 1 week in seconds
 
-# Zabbix host group and item configuration
-HOST_GROUP = 'Your_Host_Group'
-CPU_UTILIZATION_ITEM_KEY = 'system.cpu.util[,avg1]'
+# Connect to Zabbix API
+zabbix = ZabbixAPI(ZABBIX_URL)
+zabbix.login(ZABBIX_USER, ZABBIX_PASSWORD)
 
-# Calculate the time range for the last week
-end_time = int(datetime.now().timestamp())
-start_time = int((datetime.now() - timedelta(weeks=1)).timestamp())
+# Get host group ID
+host_group = zabbix.hostgroup.get(filter={'name': HOST_GROUP_NAME})
+if not host_group:
+    raise ValueError(f"Host group '{HOST_GROUP_NAME}' not found.")
+host_group_id = host_group[0]['groupid']
 
-# Zabbix API request headers
-headers = {'Content-Type': 'application/json-rpc'}
+# Get average CPU utilization for each host in the host group for the last week
+items = zabbix.item.get(filter={'hostgroupids': host_group_id, 'key_': 'system.cpu.util[,idle]'}, output=['name', 'lastvalue'])
+report_data = [['Host', 'Average CPU Utilization (%)']]
 
-# Zabbix API request payload to authenticate and get the authentication token
-auth_payload = {
-    'jsonrpc': '2.0',
-    'method': 'user.login',
-    'params': {
-        'user': ZABBIX_USERNAME,
-        'password': ZABBIX_PASSWORD,
-    },
-    'id': 1,
-}
+for item in items:
+    history = zabbix.history.get(itemids=item['itemid'], time_from=TIME_RANGE, history=0, output='extend')
+    if history:
+        cpu_values = [float(h['value']) for h in history]
+        avg_cpu = sum(cpu_values) / len(cpu_values)
+        report_data.append([item['name'], avg_cpu])
 
-# Authenticate with Zabbix API and get the authentication token
-response = requests.post(ZABBIX_API_URL, json=auth_payload, headers=headers)
-auth_result = response.json()
+# Generate Excel report
+sheet = pe.Sheet(report_data)
+sheet.save_as('cpu_utilization_report.xlsx')
 
-# Check if the authentication was successful
-if 'result' in auth_result:
-    auth_token = auth_result['result']
-
-    # Zabbix API request payload to get the host group ID
-    host_group_payload = {
-        'jsonrpc': '2.0',
-        'method': 'hostgroup.get',
-        'params': {
-            'output': 'extend',
-            'filter': {'name': HOST_GROUP},
-            'selectHosts': 'extend',
-        },
-        'auth': auth_token,
-        'id': 2,
-    }
-
-    # Get the host group ID
-    response = requests.post(ZABBIX_API_URL, json=host_group_payload, headers=headers)
-    host_group_result = response.json()
-
-    # Check if the host group was found
-    if 'result' in host_group_result and host_group_result['result']:
-        host_group_id = host_group_result['result'][0]['groupid']
-
-        # Zabbix API request payload to get the CPU utilization data for the host group
-        item_payload = {
-            'jsonrpc': '2.0',
-            'method': 'item.get',
-            'params': {
-                'output': ['lastvalue'],
-                'hostids': [host['hostid'] for host in host_group_result['result'][0]['hosts']],
-                'search': {'key_': CPU_UTILIZATION_ITEM_KEY},
-                'time_from': start_time,
-                'time_till': end_time,
-                'sortfield': 'name',
-            },
-            'auth': auth_token,
-            'id': 3,
-        }
-
-        # Get the CPU utilization data
-        response = requests.post(ZABBIX_API_URL, json=item_payload, headers=headers)
-        item_result = response.json()
-
-        # Check if the CPU utilization data was found
-        if 'result' in item_result and item_result['result']:
-            cpu_utilization_data = item_result['result']
-
-            # Create a new Excel workbook and select the active sheet
-            workbook = openpyxl.Workbook()
-            sheet = workbook.active
-
-            # Write the CPU utilization data to Excel
-            for index, data in enumerate(cpu_utilization_data):
-                sheet.cell(row=index + 1, column=1, value=data['host'])
-                sheet.cell(row=index + 1, column=2, value=data['lastvalue'])
-
-            # Save the Excel workbook
-            workbook.save(REPORT_FILE)
-            print(f"Report generated successfully: {REPORT_FILE}")
-        else:
-            print("No CPU utilization data found.")
-    else:
-        print("Host group not found.")
-else:
-    print("Failed to authenticate with Zabbix API.")
+print("Report generated successfully.")
