@@ -1,68 +1,74 @@
-import pymysql
-import openpyxl
-from openpyxl.styles import Font
+import pandas as pd
+import mysql.connector
+from datetime import datetime, timedelta
+from openpyxl import Workbook
 
-# MySQL Database Configuration
-db_host = 'your_mysql_host'
-db_user = 'your_mysql_user'
-db_password = 'your_mysql_password'
-db_name = 'your_zabbix_database'
+# Zabbix MySQL database connection details
+db_config = {
+    'host': 'your_host',
+    'user': 'your_username',
+    'password': 'your_password',
+    'database': 'zabbix'
+}
 
-# Zabbix Configuration
-host_group = 'your_host_group_name'
+# Host group name
+host_group = 'YourHostGroupName'
 
-# Excel Configuration
-report_file = 'zabbix_report.xlsx'
+# Get the start and end dates for the last week and last month
+end_date = datetime.now()
+start_date_week = end_date - timedelta(weeks=1)
+start_date_month = end_date - timedelta(days=30)
 
-# Connect to the MySQL database
-connection = pymysql.connect(host=db_host, user=db_user, password=db_password, database=db_name)
-cursor = connection.cursor()
+# Connect to the Zabbix database
+db_conn = mysql.connector.connect(**db_config)
+cursor = db_conn.cursor()
 
-# Retrieve the average CPU utilization for the last week
-query = """
-    SELECT h.host, AVG(hi.value) AS avg_cpu_utilization
-    FROM hosts h
-    INNER JOIN items i ON h.hostid = i.hostid
-    INNER JOIN history hi ON i.itemid = hi.itemid
-    WHERE h.hostid IN (
-        SELECT hostid
-        FROM hosts_groups
-        WHERE groupid IN (
-            SELECT groupid
-            FROM groups
-            WHERE name = %s
-        )
-    )
-    AND i.name = 'system.cpu.util'
-    AND hi.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 WEEK))
-    GROUP BY h.host
-"""
+# Query to fetch average system CPU utilization for the specified host group and time range
+query = '''
+SELECT h.name AS Hostname, AVG(d.value) AS Avg_CPU_Utilization
+FROM hosts h
+JOIN items i ON h.hostid = i.hostid
+JOIN history_uint d ON i.itemid = d.itemid
+JOIN hosts_groups hg ON h.hostid = hg.hostid
+JOIN groups g ON hg.groupid = g.groupid
+WHERE g.name = %s
+    AND i.key_ = 'system.cpu.util'
+    AND d.clock BETWEEN %s AND %s
+GROUP BY h.hostid, h.name
+ORDER BY Avg_CPU_Utilization ASC
+'''
 
-cursor.execute(query, (host_group,))
-results = cursor.fetchall()
+# Execute the query for the last week
+cursor.execute(query, (host_group, int(start_date_week.timestamp()), int(end_date.timestamp())))
+data_week = cursor.fetchall()
 
-# Create a new Excel workbook
-workbook = openpyxl.Workbook()
-sheet = workbook.active
+# Execute the query for the last month
+cursor.execute(query, (host_group, int(start_date_month.timestamp()), int(end_date.timestamp())))
+data_month = cursor.fetchall()
 
-# Write the column headers
-sheet['A1'] = 'Host'
-sheet['B1'] = 'Average CPU Utilization'
-sheet['A1'].font = Font(bold=True)
-sheet['B1'].font = Font(bold=True)
+# Create a Pandas DataFrame for the last week data
+df_week = pd.DataFrame(data_week, columns=['Hostname', 'Avg_CPU_Utilization (Last Week)'])
 
-# Write the data to the worksheet
-row = 2
-for host, avg_cpu_utilization in results:
-    sheet.cell(row=row, column=1).value = host
-    sheet.cell(row=row, column=2).value = avg_cpu_utilization
-    row += 1
+# Create a Pandas DataFrame for the last month data
+df_month = pd.DataFrame(data_month, columns=['Hostname', 'Avg_CPU_Utilization (Last Month)'])
+
+# Create an Excel workbook and add the data to separate sheets
+wb = Workbook()
+ws_week = wb.active
+ws_week.title = 'Last Week'
+ws_month = wb.create_sheet(title='Last Month')
+
+# Write the last week data to the worksheet
+for r in dataframe_to_rows(df_week, index=False, header=True):
+    ws_week.append(r)
+
+# Write the last month data to the worksheet
+for r in dataframe_to_rows(df_month, index=False, header=True):
+    ws_month.append(r)
 
 # Save the workbook
-workbook.save(report_file)
+wb.save('zabbix_report.xlsx')
 
 # Close the database connection
 cursor.close()
-connection.close()
-
-print(f"Zabbix report generated successfully. File saved as '{report_file}'.")
+db_conn.close()
