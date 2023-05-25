@@ -1,67 +1,54 @@
+import pymysql
 import pandas as pd
-import mysql.connector
 from openpyxl import Workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
 
-# MySQL database connection details
-db_host = 'localhost'
-db_name = 'zabbix'
-db_user = 'username'
-db_password = 'password'
+# MySQL connection details
+host = 'your_mysql_host'
+port = 3306
+database = 'your_database_name'
+username = 'your_username'
+password = 'your_password'
 
-# Host group name for which the report is generated
-host_group = 'YourHostGroup'
+# Specific host group name
+host_group = 'your_host_group_name'
 
-# Establishing MySQL connection
-cnx = mysql.connector.connect(
-    host=db_host,
-    database=db_name,
-    user=db_user,
-    password=db_password
-)
+# Connect to the MySQL database
+connection = pymysql.connect(host=host, port=port, user=username, password=password, database=database)
 
-# Query to fetch average CPU utilization for the last week for the given host group
-query = f"""
-    SELECT
-        h.name AS host,
-        AVG(hi.value) AS avg_cpu_utilization
-    FROM
-        hosts h
-    INNER JOIN
-        items i ON i.hostid = h.hostid
-    INNER JOIN
-        history hi ON hi.itemid = i.itemid
-    WHERE
-        h.status = 0
-        AND h.hostid IN (
-            SELECT
-                hg.hostid
-            FROM
-                hosts_groups hg
-            INNER JOIN
-                groups g ON g.groupid = hg.groupid
-            WHERE
-                g.name = '{host_group}'
-        )
-        AND i.key_ = 'system.cpu.util'
-        AND hi.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 WEEK))
-    GROUP BY
-        h.hostid
+# Execute the SQL query to retrieve data
+query = """
+SELECT h.name AS host, AVG(id.avg) AS avg_cpu_utilization
+FROM hosts h
+JOIN items i ON h.hostid = i.hostid
+JOIN (
+    SELECT itemid, AVG(value) AS avg
+    FROM history_float
+    WHERE clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 WEEK))
+    GROUP BY itemid
+) id ON i.itemid = id.itemid
+JOIN hosts_groups hg ON h.hostid = hg.hostid
+JOIN groups g ON hg.groupid = g.groupid
+WHERE g.name = %s AND i.key_ = 'system.cpu.util'
+GROUP BY h.hostid
 """
 
-# Fetching data from the database
-df = pd.read_sql(query, cnx)
+# Retrieve data from the database
+cursor = connection.cursor()
+cursor.execute(query, (host_group,))
+data = cursor.fetchall()
 
-# Creating Excel workbook and worksheet
+# Close the database connection
+connection.close()
+
+# Create a Pandas DataFrame from the retrieved data
+df = pd.DataFrame(data, columns=['Host', 'Average CPU Utilization'])
+
+# Create a new Excel workbook and write the DataFrame to it
 wb = Workbook()
 ws = wb.active
-
-# Writing the data to the worksheet
-for row in dataframe_to_rows(df, index=False, header=True):
+ws.append(df.columns.tolist())
+for row in df.itertuples(index=False):
     ws.append(row)
 
-# Saving the workbook
+# Save the Excel workbook
 wb.save('zabbix_report.xlsx')
-
-# Closing the database connection
-cnx.close()
