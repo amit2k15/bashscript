@@ -1,0 +1,55 @@
+import pyexcel
+from pyzabbix import ZabbixAPI
+from datetime import datetime, timedelta
+
+# Zabbix API details
+ZABBIX_URL = 'http://your-zabbix-url.com'
+ZABBIX_USERNAME = 'your-username'
+ZABBIX_PASSWORD = 'your-password'
+
+# Host group name and CPU item key
+HOST_GROUP_NAME = 'Your Host Group Name'
+CPU_ITEM_KEY = 'system.cpu.util[,idle]'
+
+# Date range for the report (last week)
+end_date = datetime.now()
+start_date = end_date - timedelta(days=7)
+
+# Connect to Zabbix API
+zabbix = ZabbixAPI(ZABBIX_URL)
+zabbix.login(ZABBIX_USERNAME, ZABBIX_PASSWORD)
+
+# Get the host group ID
+host_group = zabbix.hostgroup.get(filter={'name': HOST_GROUP_NAME})
+if not host_group:
+    raise ValueError(f"Host group '{HOST_GROUP_NAME}' not found.")
+
+host_group_id = host_group[0]['groupid']
+
+# Get the hosts in the host group
+hosts = zabbix.host.get(groupids=[host_group_id])
+if not hosts:
+    raise ValueError(f"No hosts found in the host group '{HOST_GROUP_NAME}'.")
+
+# Fetch CPU utilization data for each host
+report_data = [['Host', 'Timestamp', 'CPU Utilization (%)']]
+for host in hosts:
+    host_id = host['hostid']
+    history = zabbix.history.get(
+        output=['clock', 'value'],
+        itemids=zabbix.item.get(hostids=host_id, search={'key_': CPU_ITEM_KEY})[0]['itemid'],
+        history=0,  # Numeric (float) data type
+        time_from=start_date.timestamp(),
+        time_till=end_date.timestamp(),
+        sortfield='clock',
+        sortorder='ASC',
+    )
+
+    for entry in history:
+        timestamp = datetime.fromtimestamp(int(entry['clock']))
+        utilization = float(entry['value'])
+        report_data.append([host['host'], timestamp, utilization])
+
+# Save the report as an Excel file
+pyexcel.save_as(array=report_data, dest_file_name='cpu_utilization_report.xlsx')
+print("Report generated successfully.")
