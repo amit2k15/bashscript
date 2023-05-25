@@ -1,73 +1,99 @@
 import pymysql
-from openpyxl import Workbook
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment
+import pandas as pd
 
-# Database connection details
-db_host = 'localhost'
-db_user = 'your_username'
-db_password = 'your_password'
-db_name = 'zabbix'
+# Connect to the Zabbix MySQL database
+db = pymysql.connect(
+    host='your_mysql_host',
+    user='your_mysql_user',
+    password='your_mysql_password',
+    database='zabbix_db_name'
+)
 
-# Host group name and item key
-host_group_name = 'Your Host Group Name'
+# Specify the host group and item key
+host_group = 'Your Host Group'
 item_key = 'system.cpu.util'
 
-# Connect to the database
-connection = pymysql.connect(host=db_host, user=db_user, password=db_password, database=db_name)
-cursor = connection.cursor()
+try:
+    # Fetch average system CPU utilization for the last week
+    week_query = """
+        SELECT
+            h.name AS Host,
+            AVG(d.value) AS AvgCPUUtilizationLastWeek
+        FROM
+            items AS i
+        JOIN
+            hosts AS h ON i.hostid = h.hostid
+        JOIN
+            history_uint AS d ON i.itemid = d.itemid
+        WHERE
+            h.hostid IN (
+                SELECT
+                    hg.hostid
+                FROM
+                    hosts_groups AS hg
+                JOIN
+                    groups AS g ON hg.groupid = g.groupid
+                WHERE
+                    g.name = %s
+            )
+            AND i.key_ = %s
+            AND d.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 WEEK))
+        GROUP BY
+            h.hostid
+        ORDER BY
+            AvgCPUUtilizationLastWeek ASC
+    """
+    
+    with db.cursor() as cursor:
+        cursor.execute(week_query, (host_group, item_key))
+        week_results = cursor.fetchall()
 
-# Get the host group ID
-cursor.execute("SELECT groupid FROM groups WHERE name = %s", (host_group_name,))
-group_id = cursor.fetchone()[0]
+    # Fetch average system CPU utilization for the last month
+    month_query = """
+        SELECT
+            h.name AS Host,
+            AVG(d.value) AS AvgCPUUtilizationLastMonth
+        FROM
+            items AS i
+        JOIN
+            hosts AS h ON i.hostid = h.hostid
+        JOIN
+            history_uint AS d ON i.itemid = d.itemid
+        WHERE
+            h.hostid IN (
+                SELECT
+                    hg.hostid
+                FROM
+                    hosts_groups AS hg
+                JOIN
+                    groups AS g ON hg.groupid = g.groupid
+                WHERE
+                    g.name = %s
+            )
+            AND i.key_ = %s
+            AND d.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 MONTH))
+        GROUP BY
+            h.hostid
+        ORDER BY
+            AvgCPUUtilizationLastMonth ASC
+    """
+    
+    with db.cursor() as cursor:
+        cursor.execute(month_query, (host_group, item_key))
+        month_results = cursor.fetchall()
 
-# Get the item ID for the specified key
-cursor.execute("SELECT itemid FROM items WHERE key_ = %s", (item_key,))
-item_id = cursor.fetchone()[0]
+finally:
+    # Close the database connection
+    db.close()
 
-# Get the average values for the last week and last month
-cursor.execute("SELECT AVG(value), clock FROM history WHERE itemid = %s AND clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 WEEK)) GROUP BY clock", (item_id,))
-last_week_data = cursor.fetchall()
+# Combine the week and month results into a single dataframe
+df_week = pd.DataFrame(week_results, columns=['Host', 'AvgCPUUtilizationLastWeek'])
+df_month = pd.DataFrame(month_results, columns=['Host', 'AvgCPUUtilizationLastMonth'])
+df_combined = pd.merge(df_week, df_month, on='Host', how='outer')
 
-cursor.execute("SELECT AVG(value), clock FROM history WHERE itemid = %s AND clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 MONTH)) GROUP BY clock", (item_id,))
-last_month_data = cursor.fetchall()
+# Save the data to an Excel file
+output_file = 'zabbix_report.xlsx'
+with pd.ExcelWriter(output_file) as writer:
+    df_combined.to_excel(writer, index=False, sheet_name='Zabbix Report')
 
-# Create a new Excel workbook
-wb = Workbook()
-ws = wb.active
-ws.title = 'Zabbix Report'
-
-# Write headers
-ws['A1'] = 'Date'
-ws['B1'] = 'Average CPU Utilization'
-
-# Write last week's data
-ws['A2'] = 'Last Week'
-ws.merge_cells('A2:B2')
-ws['A2'].alignment = Alignment(horizontal='center')
-row = 3
-for avg, timestamp in last_week_data:
-    ws.cell(row=row, column=1, value=timestamp)
-    ws.cell(row=row, column=2, value=avg)
-    row += 1
-
-# Write last month's data
-ws['A' + str(row)] = 'Last Month'
-ws.merge_cells('A' + str(row) + ':B' + str(row))
-ws['A' + str(row)].alignment = Alignment(horizontal='center')
-row += 1
-for avg, timestamp in last_month_data:
-    ws.cell(row=row, column=1, value=timestamp)
-    ws.cell(row=row, column=2, value=avg)
-    row += 1
-
-# Set column widths
-ws.column_dimensions['A'].width = 20
-ws.column_dimensions['B'].width = 20
-
-# Save the workbook
-wb.save('zabbix_report.xlsx')
-
-# Close the database connection
-cursor.close()
-connection.close()
+print(f"Zabbix report generated and saved to {output_file}.")
