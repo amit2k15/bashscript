@@ -1,38 +1,67 @@
-import pyexcel as pe
-from pyzabbix import ZabbixAPI
+import pandas as pd
+import mysql.connector
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 
-# Zabbix API configuration
-ZABBIX_URL = 'http://your_zabbix_server_url'
-ZABBIX_USER = 'your_username'
-ZABBIX_PASSWORD = 'your_password'
+# MySQL database connection details
+db_host = 'localhost'
+db_name = 'zabbix'
+db_user = 'username'
+db_password = 'password'
 
-# Host group and timeframe configuration
-HOST_GROUP_NAME = 'Your_Host_Group_Name'
-TIME_RANGE = 604800  # 1 week in seconds
+# Host group name for which the report is generated
+host_group = 'YourHostGroup'
 
-# Connect to Zabbix API
-zabbix = ZabbixAPI(ZABBIX_URL)
-zabbix.login(ZABBIX_USER, ZABBIX_PASSWORD)
+# Establishing MySQL connection
+cnx = mysql.connector.connect(
+    host=db_host,
+    database=db_name,
+    user=db_user,
+    password=db_password
+)
 
-# Get host group ID
-host_group = zabbix.hostgroup.get(filter={'name': HOST_GROUP_NAME})
-if not host_group:
-    raise ValueError(f"Host group '{HOST_GROUP_NAME}' not found.")
-host_group_id = host_group[0]['groupid']
+# Query to fetch average CPU utilization for the last week for the given host group
+query = f"""
+    SELECT
+        h.name AS host,
+        AVG(hi.value) AS avg_cpu_utilization
+    FROM
+        hosts h
+    INNER JOIN
+        items i ON i.hostid = h.hostid
+    INNER JOIN
+        history hi ON hi.itemid = i.itemid
+    WHERE
+        h.status = 0
+        AND h.hostid IN (
+            SELECT
+                hg.hostid
+            FROM
+                hosts_groups hg
+            INNER JOIN
+                groups g ON g.groupid = hg.groupid
+            WHERE
+                g.name = '{host_group}'
+        )
+        AND i.key_ = 'system.cpu.util'
+        AND hi.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 WEEK))
+    GROUP BY
+        h.hostid
+"""
 
-# Get average CPU utilization for each host in the host group for the last week
-items = zabbix.item.get(filter={'hostgroupids': host_group_id, 'key_': 'system.cpu.util[,idle]'}, output=['name', 'lastvalue'])
-report_data = [['Host', 'Average CPU Utilization (%)']]
+# Fetching data from the database
+df = pd.read_sql(query, cnx)
 
-for item in items:
-    history = zabbix.history.get(itemids=item['itemid'], time_from=TIME_RANGE, history=0, output='extend')
-    if history:
-        cpu_values = [float(h['value']) for h in history]
-        avg_cpu = sum(cpu_values) / len(cpu_values)
-        report_data.append([item['name'], avg_cpu])
+# Creating Excel workbook and worksheet
+wb = Workbook()
+ws = wb.active
 
-# Generate Excel report
-sheet = pe.Sheet(report_data)
-sheet.save_as('cpu_utilization_report.xlsx')
+# Writing the data to the worksheet
+for row in dataframe_to_rows(df, index=False, header=True):
+    ws.append(row)
 
-print("Report generated successfully.")
+# Saving the workbook
+wb.save('zabbix_report.xlsx')
+
+# Closing the database connection
+cnx.close()
