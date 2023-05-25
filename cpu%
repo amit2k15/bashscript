@@ -1,74 +1,73 @@
-import pandas as pd
-import mysql.connector
-from datetime import datetime, timedelta
+import pymysql
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment
 
-# Zabbix MySQL database connection details
-db_config = {
-    'host': 'your_host',
-    'user': 'your_username',
-    'password': 'your_password',
-    'database': 'zabbix'
-}
+# Database connection details
+db_host = 'localhost'
+db_user = 'your_username'
+db_password = 'your_password'
+db_name = 'zabbix'
 
-# Host group name
-host_group = 'YourHostGroupName'
+# Host group name and item key
+host_group_name = 'Your Host Group Name'
+item_key = 'system.cpu.util'
 
-# Get the start and end dates for the last week and last month
-end_date = datetime.now()
-start_date_week = end_date - timedelta(weeks=1)
-start_date_month = end_date - timedelta(days=30)
+# Connect to the database
+connection = pymysql.connect(host=db_host, user=db_user, password=db_password, database=db_name)
+cursor = connection.cursor()
 
-# Connect to the Zabbix database
-db_conn = mysql.connector.connect(**db_config)
-cursor = db_conn.cursor()
+# Get the host group ID
+cursor.execute("SELECT groupid FROM groups WHERE name = %s", (host_group_name,))
+group_id = cursor.fetchone()[0]
 
-# Query to fetch average system CPU utilization for the specified host group and time range
-query = '''
-SELECT h.name AS Hostname, AVG(d.value) AS Avg_CPU_Utilization
-FROM hosts h
-JOIN items i ON h.hostid = i.hostid
-JOIN history_uint d ON i.itemid = d.itemid
-JOIN hosts_groups hg ON h.hostid = hg.hostid
-JOIN groups g ON hg.groupid = g.groupid
-WHERE g.name = %s
-    AND i.key_ = 'system.cpu.util'
-    AND d.clock BETWEEN %s AND %s
-GROUP BY h.hostid, h.name
-ORDER BY Avg_CPU_Utilization ASC
-'''
+# Get the item ID for the specified key
+cursor.execute("SELECT itemid FROM items WHERE key_ = %s", (item_key,))
+item_id = cursor.fetchone()[0]
 
-# Execute the query for the last week
-cursor.execute(query, (host_group, int(start_date_week.timestamp()), int(end_date.timestamp())))
-data_week = cursor.fetchall()
+# Get the average values for the last week and last month
+cursor.execute("SELECT AVG(value), clock FROM history WHERE itemid = %s AND clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 WEEK)) GROUP BY clock", (item_id,))
+last_week_data = cursor.fetchall()
 
-# Execute the query for the last month
-cursor.execute(query, (host_group, int(start_date_month.timestamp()), int(end_date.timestamp())))
-data_month = cursor.fetchall()
+cursor.execute("SELECT AVG(value), clock FROM history WHERE itemid = %s AND clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 MONTH)) GROUP BY clock", (item_id,))
+last_month_data = cursor.fetchall()
 
-# Create a Pandas DataFrame for the last week data
-df_week = pd.DataFrame(data_week, columns=['Hostname', 'Avg_CPU_Utilization (Last Week)'])
-
-# Create a Pandas DataFrame for the last month data
-df_month = pd.DataFrame(data_month, columns=['Hostname', 'Avg_CPU_Utilization (Last Month)'])
-
-# Create an Excel workbook and add the data to separate sheets
+# Create a new Excel workbook
 wb = Workbook()
-ws_week = wb.active
-ws_week.title = 'Last Week'
-ws_month = wb.create_sheet(title='Last Month')
+ws = wb.active
+ws.title = 'Zabbix Report'
 
-# Write the last week data to the worksheet
-for r in dataframe_to_rows(df_week, index=False, header=True):
-    ws_week.append(r)
+# Write headers
+ws['A1'] = 'Date'
+ws['B1'] = 'Average CPU Utilization'
 
-# Write the last month data to the worksheet
-for r in dataframe_to_rows(df_month, index=False, header=True):
-    ws_month.append(r)
+# Write last week's data
+ws['A2'] = 'Last Week'
+ws.merge_cells('A2:B2')
+ws['A2'].alignment = Alignment(horizontal='center')
+row = 3
+for avg, timestamp in last_week_data:
+    ws.cell(row=row, column=1, value=timestamp)
+    ws.cell(row=row, column=2, value=avg)
+    row += 1
+
+# Write last month's data
+ws['A' + str(row)] = 'Last Month'
+ws.merge_cells('A' + str(row) + ':B' + str(row))
+ws['A' + str(row)].alignment = Alignment(horizontal='center')
+row += 1
+for avg, timestamp in last_month_data:
+    ws.cell(row=row, column=1, value=timestamp)
+    ws.cell(row=row, column=2, value=avg)
+    row += 1
+
+# Set column widths
+ws.column_dimensions['A'].width = 20
+ws.column_dimensions['B'].width = 20
 
 # Save the workbook
 wb.save('zabbix_report.xlsx')
 
 # Close the database connection
 cursor.close()
-db_conn.close()
+connection.close()
