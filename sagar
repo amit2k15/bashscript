@@ -1,1 +1,13 @@
-az login --service-principal --username <service-principal-id> --password <service-principal-secret> --tenant <tenant-id> --subscription <subscription-id>
+Hi Kranthi,
+
+I hope this email finds you well. I am writing to address the recent influx of emails triggered from Zabbix, which were a result of our monthly patching activity. It appears that due to this maintenance activity, communication between Zabbix and the monitored databases was temporarily disrupted, leading to the flood of notifications.
+
+I wanted to apologize for any inconvenience this may have caused you and assure you that steps have been taken to rectify the issue. In order to avoid further disruption, we have implemented measures to ensure that future patching activities do not interfere with the normal functioning of Zabbix.
+
+Moving forward, please note that any emails triggered from Zabbix related to monthly patching activities can be safely ignored. These notifications are a direct result of our internal processes and do not require any action or attention from you.
+
+However, I would like to emphasize that if you receive any other alerts or notifications from Zabbix that are not related to the monthly patching activity, please treat them as usual and respond accordingly. Our team will be actively monitoring and addressing any other issues or concerns that may arise.
+
+Once again, I apologize for any inconvenience caused by the recent email overload. If you have any questions or require further clarification, please do not hesitate to reach out to me directly. Thank you for your understanding and cooperation.
+
+Best regards,
