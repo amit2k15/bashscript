@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Path to the .jks file
+JKS_FILE="/path/to/your/file.jks"
+
+# Command to extract alias names and expiry dates from the .jks file
+CERT_DATA=$(keytool -list -v -keystore "$JKS_FILE" -storepass your_password)
+
+# Initialize an array to store the discovered alias names
+ALIAS_ARRAY=()
+
+# Extract the alias names from the certificate data
+while IFS= read -r line; do
+  if [[ $line =~ "Alias name:" ]]; then
+    alias_name=$(echo "$line" | cut -d':' -f2 | awk '{$1=$1};1')
+    ALIAS_ARRAY+=("$alias_name")
+  fi
+done <<< "$CERT_DATA"
+
+# Create a JSON object for the Zabbix LLD output
+LLD_JSON="{\"data\":["
+
+# Iterate over the alias names and create LLD JSON entries
+for alias in "${ALIAS_ARRAY[@]}"; do
+  LLD_JSON+="{\"{#ALIAS}\":\"$alias\"},"
+done
+
+# Remove the trailing comma
+LLD_JSON="${LLD_JSON%,}]}"
+echo "$LLD_JSON"
+
+# Retrieve the expiry in days for the provided alias
+get_expiry_days() {
+  alias=$1
+  expiry_date=$(keytool -list -v -keystore "$JKS_FILE" -storepass your_password -alias "$alias" | grep "Valid until:" | awk '{print $4, $5, $6}')
+  expiry_timestamp=$(date -d "$expiry_date" +%s)
+  current_timestamp=$(date +%s)
+  expiry_days=$(( ($expiry_timestamp - $current_timestamp) / 86400 ))
+  echo "$expiry_days"
+}
+
+# Example usage: Get expiry in days for the provided alias
+alias="$1"  # Alias name provided as an argument
+expiry_days=$(get_expiry_days "$alias")
+echo "$expiry_days"
