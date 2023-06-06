@@ -1,0 +1,30 @@
+#!/bin/bash
+
+keystore_file="your_keystore.jks"
+keystore_password="your_keystore_password"
+
+output_directory="output_directory"
+
+# Create the output directory if it doesn't exist
+mkdir -p "$output_directory"
+
+# List all the aliases in the keystore
+aliases=$(keytool -list -keystore "$keystore_file" -storepass "$keystore_password" | grep "Alias name:" | awk '{print $3}')
+
+# Loop through each alias and export the certificate as a PEM file
+for alias in $aliases; do
+    # Export the certificate as a temporary DER file
+    temp_der_file="/tmp/${alias}.der"
+    keytool -exportcert -keystore "$keystore_file" -storepass "$keystore_password" -alias "$alias" -file "$temp_der_file"
+
+    # Convert the DER file to PEM format
+    pem_file="${output_directory}/${alias}.pem"
+    openssl x509 -inform der -in "$temp_der_file" -out "$pem_file"
+
+    # Clean up the temporary DER file
+    rm "$temp_der_file"
+
+    echo "Exported certificate for alias: $alias"
+done
+
+echo "All certificates exported successfully."
