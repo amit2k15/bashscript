@@ -1,43 +1,106 @@
-import pandas as pd
-import pymysql
-from openpyxl import Workbook
+import openpyxl
+import requests
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment
 
-# MySQL connection details
-host = 'localhost'
-port = 3306
-user = 'your_username'
-password = 'your_password'
-database = 'your_database'
 
-# Custom time range
-start_time = '2023-06-01 00:00:00'
-end_time = '2023-06-07 23:59:59'
+def generate_excel_report(start_date, end_date):
+    # Zabbix API information
+    zabbix_url = 'http://your_zabbix_server/api_jsonrpc.php'
+    zabbix_username = 'your_username'
+    zabbix_password = 'your_password'
 
-# Connect to MySQL database
-connection = pymysql.connect(host=host, port=port, user=user, password=password, database=database)
+    # Zabbix API authentication
+    auth_payload = {
+        'jsonrpc': '2.0',
+        'method': 'user.login',
+        'params': {
+            'user': zabbix_username,
+            'password': zabbix_password
+        },
+        'id': 1,
+        'auth': None
+    }
 
-# Query the database
-query = f"""
-    SELECT clock, AVG(value_min) AS min_value, AVG(value_max) AS max_value, AVG(value_avg) AS avg_value
-    FROM trends
-    WHERE itemid = (SELECT itemid FROM items WHERE key_ = 'system.cpu.util')
-    AND clock >= UNIX_TIMESTAMP('{start_time}') AND clock <= UNIX_TIMESTAMP('{end_time}')
-    GROUP BY DATE(FROM_UNIXTIME(clock))
-    ORDER BY clock
-"""
-df = pd.read_sql(query, connection)
+    try:
+        response = requests.post(zabbix_url, json=auth_payload)
+        response.raise_for_status()
+        auth_result = response.json()
+        auth_token = auth_result['result']
+    except (requests.exceptions.RequestException, KeyError) as e:
+        print('Failed to authenticate with Zabbix API:', e)
+        return
 
-# Close the database connection
-connection.close()
+    # Zabbix API request to get CPU utilization data from trends.get
+    cpu_util_payload = {
+        'jsonrpc': '2.0',
+        'method': 'trends.get',
+        'params': {
+            'output': 'extend',
+            'itemids': 'your_cpu_item_id',
+            'time_from': start_date,
+            'time_till': end_date,
+            'limit': 5000,
+            'sortfield': 'clock',
+            'sortorder': 'ASC',
+            'history': 0
+        },
+        'auth': auth_token,
+        'id': 2
+    }
 
-# Create Excel workbook and add the data
-wb = Workbook()
-ws = wb.active
-ws.append(['Date', 'Min Value', 'Max Value', 'Avg Value'])
+    try:
+        response = requests.post(zabbix_url, json=cpu_util_payload)
+        response.raise_for_status()
+        cpu_util_result = response.json()
+    except requests.exceptions.RequestException as e:
+        print('Failed to retrieve CPU utilization data from Zabbix API:', e)
+        return
 
-# Iterate over the dataframe and add rows to the worksheet
-for _, row in df.iterrows():
-    ws.append([pd.to_datetime(row['clock'], unit='s').strftime('%Y-%m-%d'), row['min_value'], row['max_value'], row['avg_value']])
+    # Prepare data for the Excel report
+    data = {}
+    for entry in cpu_util_result['result']:
+        timestamp = entry['clock']
+        value = float(entry['value_avg'])
+        date = datetime.fromtimestamp(int(timestamp)).date()
+        if date not in data:
+            data[date] = {'min': value, 'max': value, 'sum': value, 'count': 1}
+        else:
+            if value < data[date]['min']:
+                data[date]['min'] = value
+            if value > data[date]['max']:
+                data[date]['max'] = value
+            data[date]['sum'] += value
+            data[date]['count'] += 1
 
-# Save the workbook
-wb.save('cpu_report.xlsx')
+    # Generate Excel report
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'CPU Utilization Report'
+
+    # Write headers
+    headers = ['Date', 'Minimum', 'Maximum', 'Average']
+    for col_num, header in enumerate(headers, 1):
+        col_letter = get_column_letter(col_num)
+        cell = worksheet.cell(row=1, column=col_num, value=header)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.font = cell.font.copy(bold=True)
+
+    # Write data rows
+    for row_num, (date, values) in enumerate(data.items(), 2):
+        worksheet.cell(row=row_num, column=1, value=date.strftime('%Y-%m-%d'))
+        worksheet.cell(row=row_num, column=2, value=values['min'])
+        worksheet.cell(row=row_num, column=3, value=values['max'])
+        worksheet.cell(row=row_num, column=4, value=values['sum'] / values['count'])
+
+    # Save the Excel file
+    filename = f'cpu_utilization_report_{start_date}_{end_date}.xlsx'
+    workbook.save(filename)
+    print('Excel report generated:', filename)
+
+
+# Specify the custom time range for the report
+start_date = '2023-06-01 00:00:00'
+end_date = '2023-06-07 23:59:59'
+
+generate_excel_report(start_date, end_date)
