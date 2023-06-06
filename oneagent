@@ -1,21 +1,25 @@
 ---
 - name: Install Dynatrace OneAgent
   hosts: your_server
-  become: yes
-  gather_facts: yes
-
+  become: true
+  vars:
+    dynatrace_api_token: "YOUR_DYNATRACE_API_TOKEN"
   tasks:
     - name: Download Dynatrace OneAgent installer
       get_url:
-        url: "https://your-dynatrace-url.com/oneagent/{{ ansible_system }}/{{ ansible_distribution_major_version }}/{{ ansible_architecture }}/latest"
+        url: "https://your-environment-url/api/v1/deployment/installer/agent/unix/default/latest?Api-Token={{ dynatrace_api_token }}"
         dest: /tmp/dynatrace-oneagent.sh
         mode: '0755'
-        validate_certs: no
 
     - name: Install Dynatrace OneAgent
       command: /tmp/dynatrace-oneagent.sh APP_LOG_CONTENT_ACCESS=1
 
-    - name: Restart service
-      systemd:
-        name: oneagent
-        state: restarted
+    - name: Check if OneAgent is installed
+      stat:
+        path: /opt/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+      register: oneagent_installed
+
+    - name: Print installation status
+      debug:
+        msg: "Dynatrace OneAgent is installed."
+      when: oneagent_installed.stat.exists
