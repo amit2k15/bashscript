@@ -1,0 +1,21 @@
+---
+- name: Install Dynatrace OneAgent
+  hosts: your_server
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Download Dynatrace OneAgent installer
+      get_url:
+        url: "https://your-dynatrace-url.com/oneagent/{{ ansible_system }}/{{ ansible_distribution_major_version }}/{{ ansible_architecture }}/latest"
+        dest: /tmp/dynatrace-oneagent.sh
+        mode: '0755'
+        validate_certs: no
+
+    - name: Install Dynatrace OneAgent
+      command: /tmp/dynatrace-oneagent.sh APP_LOG_CONTENT_ACCESS=1
+
+    - name: Restart service
+      systemd:
+        name: oneagent
+        state: restarted
