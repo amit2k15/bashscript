@@ -1,0 +1,43 @@
+import pandas as pd
+import pymysql
+from openpyxl import Workbook
+
+# MySQL connection details
+host = 'localhost'
+port = 3306
+user = 'your_username'
+password = 'your_password'
+database = 'your_database'
+
+# Custom time range
+start_time = '2023-06-01 00:00:00'
+end_time = '2023-06-07 23:59:59'
+
+# Connect to MySQL database
+connection = pymysql.connect(host=host, port=port, user=user, password=password, database=database)
+
+# Query the database
+query = f"""
+    SELECT clock, AVG(value_min) AS min_value, AVG(value_max) AS max_value, AVG(value_avg) AS avg_value
+    FROM trends
+    WHERE itemid = (SELECT itemid FROM items WHERE key_ = 'system.cpu.util')
+    AND clock >= UNIX_TIMESTAMP('{start_time}') AND clock <= UNIX_TIMESTAMP('{end_time}')
+    GROUP BY DATE(FROM_UNIXTIME(clock))
+    ORDER BY clock
+"""
+df = pd.read_sql(query, connection)
+
+# Close the database connection
+connection.close()
+
+# Create Excel workbook and add the data
+wb = Workbook()
+ws = wb.active
+ws.append(['Date', 'Min Value', 'Max Value', 'Avg Value'])
+
+# Iterate over the dataframe and add rows to the worksheet
+for _, row in df.iterrows():
+    ws.append([pd.to_datetime(row['clock'], unit='s').strftime('%Y-%m-%d'), row['min_value'], row['max_value'], row['avg_value']])
+
+# Save the workbook
+wb.save('cpu_report.xlsx')
