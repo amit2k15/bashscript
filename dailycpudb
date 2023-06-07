@@ -59,6 +59,16 @@ for row in results:
 # Close the database connection
 db.close()
 
+# Create a new Excel workbook
+workbook = Workbook()
+sheet = workbook.active
+
+# Write the column headers
+sheet['A1'] = 'Date'
+sheet['B1'] = 'Min Value'
+sheet['C1'] = 'Max Value'
+sheet['D1'] = 'Avg Value'
+
 # Write the data rows
 for row_num, row_data in enumerate(results, start=2):
     sheet.cell(row=row_num, column=1, value=row_data[0])
@@ -68,4 +78,5 @@ for row_num, row_data in enumerate(results, start=2):
 
 # Save the workbook to a file
 workbook.save('zabbix_data.xlsx')
+
 
