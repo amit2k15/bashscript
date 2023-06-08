@@ -1,0 +1,11 @@
+Dear [Recipient's Name],
+
+I hope this email finds you well. I am writing to follow up on our recent discussion regarding the enablement of certificate monitoring in Zabbix for the URLs you specified. I have successfully confirmed that the same certificate is bound to the individual nodes mentioned in the requirements file.
+
+However, in order to monitor the certificates on these individual nodes effectively, we require the precise location of the certificate file. During our conversation, you mentioned that you remove the certificates after importing them to IIS. Therefore, I kindly request you to check the location of the certificate file for each of the individual nodes.
+
+While you're investigating the certificate file location, I will explore the possibility of monitoring IIS to discover the certificate on each individual node. This approach will ensure that we can effectively monitor and manage the certificates within Zabbix.
+
+Please provide the certificate file locations as soon as you have them. If you have any questions or need further clarification, please don't hesitate to reach out to me. I am more than happy to assist you.
+
+Thank you for your attention to this matter. I look forward to your prompt response.
