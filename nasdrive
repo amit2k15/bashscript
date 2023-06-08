@@ -1,0 +1,24 @@
+UnsafeUserParameters=1
+
+UserParameter=nas.drives[*],powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-PSDrive -PSProvider 'FileSystem' | Where-Object {$_.Root -like `$args[0]} | Select-Object @{Name='Used'; Expression={$_.Used}}, @{Name='Free'; Expression={$_.Free}}, @{Name='Total'; Expression={$_.Used + $_.Free}}" "$1"
+
+Restart Zabbix Agent: After modifying the Zabbix agent configuration file, restart the Zabbix agent service to apply the changes.
+
+Configure Item in Zabbix: Now, you need to configure an item in Zabbix to monitor the NAS drives.
+
+Log in to your Zabbix web interface.
+
+Go to "Configuration" and navigate to the host representing the Windows server with the mapped NAS drives.
+
+Click on "Items" and then click "Create Item" to add a new item.
+
+Configure the item with the following details:
+
+Name: Choose a name for the item, e.g., "NAS Drive Usage".
+Type: Select "Zabbix agent".
+Key: Enter nas.drives["<drive_letter>:\\"], replacing <drive_letter> with the actual drive letter of the mapped NAS drive.
+Type of information: Select "Numeric (unsigned)".
+Update interval: Set the desired monitoring interval.
+Save the item configuration.
+
+Monitor the NAS Drive: Zabbix will now start monitoring the specified NAS drive on the Windows server. You can view the monitored data, such as disk usage, in the Zabbix web interface by accessing the corresponding host and navigating to the "Monitoring" section.
