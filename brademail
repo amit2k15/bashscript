@@ -1,0 +1,31 @@
+Hi Brad,
+
+I hope this email finds you well. I would like to provide you with an update on the minutes of our recent meeting, as well as share an exciting new feature introduced by Zabbix, our monitoring tool.
+Here's a brief summary of the key points discussed in the meeting:
+
+[Meeting Point 1]
+[Summary of the discussion or decision made]
+
+[Meeting Point 2]
+[Summary of the discussion or decision made]
+
+[Meeting Point 3]
+[Summary of the discussion or decision made]
+
+Now, let's delve into the exciting new feature of Zabbix on certificate monitoring. This new feature offers cloud, URL, and on-prem certificate monitoring, providing us with enhanced visibility and control over our certificates. Additionally, it triggers alerts based on the expiration date, ensuring that we are proactively notified to take necessary actions.
+
+Information Alert: 90 days to expiry
+
+This alert is designed to inform us well in advance about certificates that will expire in 90 days. It serves as an early reminder to start planning for certificate renewal or updates.
+Warning Alert: 60 days to expiry
+
+The warning alert notifies us when certificates are within 60 days of expiration. It indicates that we should prioritize certificate renewal to avoid any potential disruptions.
+Minor Alert: 30 days to expiry
+
+This alert acts as a final reminder when certificates are approaching expiration within 30 days. It prompts immediate action to prevent any downtime or security risks.
+By leveraging these alerts, we can proactively manage our certificates and ensure their continuous validity. The Zabbix platform provides a centralized and comprehensive monitoring solution, enabling us to monitor certificates across various environments, including cloud, URL, and on-premises.
+
+I encourage each team member to familiarize themselves with this new feature and explore the possibilities it offers. If you have any questions or need assistance, please don't hesitate to reach out to me or our technical team.
+
+Thank you for your attention, and let's make the most of this exciting addition to our monitoring capabilities.
+
