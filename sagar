@@ -1,11 +1,26 @@
-Dear [SSO Team],
+Dear Michael,
 
-I hope this email finds you well. As discussed in our previous conversation, our team is planning to migrate our Zabbix Stage instance from version 5.0 to version 6.0. Additionally, senior leadership has made the decision to migrate our backend servers from RHEL 7 to RHEL 9. Along with these changes, we will also be updating the existing Stage application URL from https://stage-zabbix.optum.com to https://orxzabbix-stage.optum.com.
+I hope this email finds you well. I wanted to provide you with a summary of the discussions and decisions made during our last meeting. Here are the key points we covered:
 
-To ensure a smooth transition, we kindly request your assistance in integrating SAML-based Single Sign-On (SSO) with our new Stage instance. The integration with SSO is crucial for our security and access management requirements. We aim to decommission the existing Stage instance once the Zabbix Stage upgrade to version 6.0 is completed successfully.
+Access Revocation:
+In line with the recent management decision, we have revoked super admin access for all application teams, except for the Zabbix Team. This change is intended to streamline access control and ensure better security measures across the board.
 
-In line with your recommendation, I have created a new Requested Item (RITM) and filled out the provided form with the relevant details. The RITM will help track the progress of this integration request.
+Template Visibility:
+Due to the revocation of super admin access, you may have noticed that the default templates are no longer visible to you. These templates were originally developed by the super admin, and their visibility was restricted as part of the access changes. However, please note that you still have read-only access to these default templates.
 
-We understand that you have multiple responsibilities and appreciate your support in prioritizing this request. If you require any additional information or have any questions, please do not hesitate to reach out to us. We look forward to working together to accomplish this migration successfully.
+Read-only Access:
+As mentioned, read-only access has been granted to the default templates. This will allow you to view and analyze the configuration settings and parameters of these templates. However, modifying or making changes to them will require the involvement of the super admin or the designated team responsible for template management.
 
-Thank you for your attention to this matter, and we appreciate your prompt action.
+Server Access:
+I am pleased to inform you that Avella server access has been granted to you. This will enable you to leverage its functionalities and perform the necessary tasks related to monitoring and managing the server. Please make sure to adhere to the guidelines and best practices established for server usage.
+
+New Requirement:
+During the meeting, we received a new requirement from Mark to add custom monitoring, which necessitates enabling remote commands in the Zabbix agent config file. As we discussed, I kindly request that you enable this feature in the agent config file. Once this step is completed, please notify us so that we can proceed with enabling the necessary changes in Zabbix accordingly.
+
+Should you have any further questions or require additional information regarding the above points, please don't hesitate to reach out to me. I am here to assist you and ensure a smooth transition during these changes.
+
+Thank you for your attention and cooperation in this matter.
+
+Best regards,
+
+[Your Name]
