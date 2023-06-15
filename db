@@ -1,0 +1,12 @@
+On Saturday, June 13th, 2023, an issue was discovered on the Zabbix stage instance, resulting in the application not functioning correctly. After conducting a thorough investigation, it was determined that the problem stemmed from the database, specifically duplicate entries appearing in the alerts table log. It is important to note that no similar issues were detected on either the stage or production Zabbix instances.
+
+Additionally, when individual nodes were examined, discrepancies in the alert table count were observed. As a course of action, it was decided to proceed with phase 2 activities while closely monitoring the database for the next 15 days following the upgrade. After this observation period, a decision will be made regarding the upgrade of the production environment.
+
+Phase 2 Activity Date:
+As suggested by Kranthi during the meeting, we are planning to proceed with the Phase 2 activity next week. However, we still need to confirm the exact date for this activity. Kranthi, could you please update us with the finalized date so that we can schedule the necessary resources and plan accordingly?
+
+Database Access for Zabbix Team:
+As discussed, it is essential for the Zabbix team to have readonly access to the database for monitoring purposes. This access will enable them to observe and track the database performance effectively. I kindly request the DB team to provide the required readonly access to the Zabbix team at your earliest convenience. If there are any specific instructions or access details needed, please let us know, and we will ensure smooth coordination between the teams.
+
+Observation Period for Stage Database:
+Following the completion of the Phase 2 activity, it is crucial to observe the Stage Database for a duration of 15 days. This observation period will allow us to identify any potential issues such as duplicate entries or abnormal behavior. Based on the observations during this period, we can then plan for the production database upgrade accordingly. I kindly request the DB team to collaborate with us during this observation period and provide any necessary support or insights as required.
