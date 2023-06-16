@@ -1,0 +1,41 @@
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email import encoders
+from pathlib import Path
+
+def send_email(sender, receiver, subject, body, attachment_paths):
+    # Set up the SMTP server
+    smtp_server = smtplib.SMTP('localhost')  # Replace 'localhost' with your SMTP server address
+
+    # Create the email
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = receiver
+    msg['Subject'] = subject
+
+    # Add body to the email
+    msg.attach(MIMEText(body, 'plain'))
+
+    # Attach files
+    for path in attachment_paths:
+        attachment = MIMEBase('application', 'octet-stream')
+        with open(path, 'rb') as file:
+            attachment.set_payload(file.read())
+        encoders.encode_base64(attachment)
+        attachment.add_header('Content-Disposition', f'attachment; filename={Path(path).name}')
+        msg.attach(attachment)
+
+    # Send the email
+    smtp_server.sendmail(sender, receiver, msg.as_string())
+    smtp_server.quit()
+
+# Usage example
+sender = 'your_email@example.com'
+receiver = 'recipient@example.com'
+subject = 'Test Email'
+body = 'This is a test email.'
+attachment_paths = ['path/to/file1.txt', 'path/to/file2.jpg']
+
+send_email(sender, receiver, subject, body, attachment_paths)
