@@ -1,10 +1,11 @@
 SELECT h.host, COUNT(*) AS problem_count
 FROM hosts h
-JOIN items i ON i.hostid = h.hostid
-JOIN functions f ON f.itemid = i.itemid
-JOIN triggers t ON t.triggerid = f.triggerid
-JOIN hosts_groups hg ON hg.hostid = h.hostid
-JOIN groups g ON g.groupid = hg.groupid
-JOIN problem p ON p.objectid = t.triggerid
-WHERE g.name = 'your_host_group_name'
+JOIN hosts_groups hg ON h.hostid = hg.hostid
+JOIN groups g ON hg.groupid = g.groupid
+JOIN triggers t ON h.hostid = t.hostid
+JOIN functions f ON t.triggerid = f.triggerid
+JOIN items i ON f.itemid = i.itemid
+JOIN events e ON t.triggerid = e.objectid
+WHERE g.name = 'YourHostGroupName'
+  AND e.value = 1
 GROUP BY h.host;
