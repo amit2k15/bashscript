@@ -19,8 +19,7 @@ JOIN events e ON p.eventid = e.eventid
 JOIN hosts_groups hg ON h.hostid = hg.hostid
 JOIN groups g ON hg.groupid = g.groupid
 WHERE g.name = 'YourHostGroupName'
-AND e.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 DAY)) -- Change interval as needed
-AND p.source = 0
+  AND h.status = 0
+  AND e.source = 0
 GROUP BY h.host
 ORDER BY problem_count DESC;
-
