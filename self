@@ -1,22 +1,13 @@
----
-- name: Install Dynatrace OneAgent
-  hosts: all
-  become: true
+#!/bin/bash
 
-  tasks:
-    - name: Download Dynatrace OneAgent installer
-      get_url:
-        url: "https://<your-environment-id>.live.dynatrace.com/api/v1/deployment/installer/agent/unix/default/latest?Api-Token=<your-api-token>"
-        dest: /tmp/dynatrace-oneagent.sh
-        mode: 0755
+service_name="your_service_name"
 
-    - name: Install Dynatrace OneAgent
-      command: /tmp/dynatrace-oneagent.sh APP_LOG_CONTENT_ACCESS=1
+status=$(systemctl is-active $service_name)
 
-    - name: Verify Dynatrace OneAgent installation
-      shell: /opt/dynatrace/oneagent/agent/tools/agentinfo.sh
-      register: agent_info
-
-    - name: Print Dynatrace OneAgent version
-      debug:
-        msg: "Dynatrace OneAgent version {{ agent_info.stdout_lines[0] }}"
+if [[ $status == "active" ]]; then
+    echo "$service_name is running."
+elif [[ $status == "inactive" ]]; then
+    echo "$service_name is not running."
+else
+    echo "Unable to determine the status of $service_name."
+fi
