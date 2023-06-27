@@ -1,1 +1,22 @@
-Zabbix is a powerful open-source monitoring solution for server infrastructure. With Zabbix, you can monitor various metrics and events, set up triggers to detect issues, and receive alerts for proactive problem resolution. It provides a comprehensive view of server performance, including CPU, memory, disk usage, network traffic, and more. Zabbix allows you to configure thresholds and notifications, ensuring timely alerts for critical events. The web-based interface offers real-time monitoring, historical data analysis, and customizable dashboards for visualizing server health. Zabbix's scalability enables monitoring of large-scale server infrastructures, and its flexible architecture allows integration with other tools and systems. With its robust monitoring capabilities, Zabbix helps organizations maintain system availability, optimize performance, and mitigate potential server-related problems efficiently.
+---
+- name: Install Dynatrace OneAgent
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Download Dynatrace OneAgent installer
+      get_url:
+        url: "https://<your-environment-id>.live.dynatrace.com/api/v1/deployment/installer/agent/unix/default/latest?Api-Token=<your-api-token>"
+        dest: /tmp/dynatrace-oneagent.sh
+        mode: 0755
+
+    - name: Install Dynatrace OneAgent
+      command: /tmp/dynatrace-oneagent.sh APP_LOG_CONTENT_ACCESS=1
+
+    - name: Verify Dynatrace OneAgent installation
+      shell: /opt/dynatrace/oneagent/agent/tools/agentinfo.sh
+      register: agent_info
+
+    - name: Print Dynatrace OneAgent version
+      debug:
+        msg: "Dynatrace OneAgent version {{ agent_info.stdout_lines[0] }}"
