@@ -1,0 +1,17 @@
+Dear Michael,
+
+Thank you for reaching out to us regarding the application dashboard access. We appreciate your interest and would like to provide you with the latest update.
+
+Currently, the mentioned application has been successfully onboarded in our Enterprise Zabbix and Enterprise Grafana systems. However, we regret to inform you that there is no specific dashboard access available in Enterprise Zabbix to drill down into the issues you mentioned. The Enterprise Zabbix system primarily provides an overview of monitors through our Oneview dashboard.
+
+Nevertheless, we understand the importance of having access to detailed monitoring information for the application. To address this, we have explored an alternative solution. There is a feasibility to onboard the same application in our ORX Zabbix system, which will provide you with the necessary access to monitor the application.
+
+By utilizing ORX Zabbix, you will be able to access the application's specific dashboard, enabling you to drill down into the issues and gain more insights into its performance. This will ensure a more efficient troubleshooting and monitoring experience for you.
+
+Please let us know if you would like to proceed with onboarding the application in ORX Zabbix. Once we receive your confirmation, we will initiate the necessary steps to grant you access to the Zabbix monitoring system for the application.
+
+If you have any further questions or require additional information, please feel free to reach out to us. We are here to assist you.
+
+Thank you for your understanding and patience.
+
+Best regards,
