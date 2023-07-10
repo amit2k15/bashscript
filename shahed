@@ -1,0 +1,15 @@
+Dear [Recipient's Name],
+
+I hope this email finds you well. I am writing to inform you about our recent discussion regarding the Zabbix prod instance and its database. As you are aware, our prod instance currently holds a significant amount of data, with a total size of 5.40 TB. The History tables, in particular, contribute a substantial portion of this data.
+
+During our discussion, we addressed the need to explore feasible solutions that would allow for a smooth migration and an improved data maintenance strategy. I kindly request your assistance in assessing these potential solutions and suggesting a better approach. Below are the key points we discussed:
+
+Migration of Existing PXC Setup to ProxySQL: We would like to explore the possibility of migrating the existing Percona XtraDB Cluster (PXC) setup to ProxySQL. Specifically, we are interested in migrating only one month's worth of data for large tables. Your expertise in evaluating the feasibility of this solution would be highly appreciated.
+
+Partitioning of Large Tables: Another approach we would like to consider is partitioning the large tables based on a daily or monthly basis. This would allow us to purge old data effectively while retaining the necessary data for analysis. We would greatly value your insights on implementing this partitioning strategy.
+
+Backup and Fresh Data Collection: Alternatively, we propose taking backups of all tables except for the large ones, such as the history and trend tables. These backups would be stored in a new database. Subsequently, we would reconfigure the Zabbix prod web and app to connect to the new database, enabling the collection of fresh data. Please note that we intend to apply the same partitioning concept to this new database, keeping only the last three months' worth of data and purging older records.
+
+Your expertise and guidance in assessing these solutions would be invaluable to ensure a successful transition and improved data management within our Zabbix prod instance. If you have any additional suggestions or alternative approaches, please feel free to share them.
+
+Thank you for your attention to this matter. We look forward to your prompt response, providing us with your insights and recommendations. Should you require any further information or clarification, please do not hesitate to reach out.
