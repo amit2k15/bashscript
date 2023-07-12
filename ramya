@@ -1,0 +1,19 @@
+Dear [Recipient's Name],
+
+I hope this email finds you well. I wanted to address some points that we discussed regarding Zabbix monitoring for DSG applications. Below is a summary of the topics we covered and the subsequent actions taken:
+
+Problem Ticket: I reviewed the problem ticket regarding the alert triggered from Zabbix, which resulted in the creation of a WAR room. Upon analysis, it was found that the monitor was correctly configured in Zabbix. However, the issue was caused by a change deployed for the SilentAuth module. Once the change was rolled back, the alert was cleared from Zabbix.
+
+Change Ticket: There seems to be a change ticket related to vulnerabilities. Please provide more information or any updates regarding this matter.
+
+Notification Issues: You mentioned that you are not receiving notifications for any 500 errors or other issues. We investigated a specific use case where a 500 issue occurred on July 8th, and Zabbix successfully triggered email notifications and interlink events. As suggested, we recommend adding the SRE DL for DSG Zabbix alerts to ensure proper notification in the future.
+
+Frequent 500 Errors: It has been observed that 500 errors in Splunk are frequently triggered by the Zabbix user agent. We have identified three IP addresses from which these requests originate, with two of them belonging to Zabbix. We have begun debugging this issue and have captured a few events in Splunk. However, no corresponding issues were found in Zabbix for those specific hosts. We will continue to analyze this situation in more detail and connect with you on Friday to share any additional information we uncover.
+
+Administrative Access and Change Tracking: Currently, every team involved, including DSG Monitoring, the Application team, and our team, has administrative access to make changes to the monitors for DSG applications. Unfortunately, despite multiple follow-ups, no one is logging any P5 incidents when making changes. Additionally, there is inconsistency in notifying us of requirements, with some changes being made without notification. This makes it challenging for us to identify who has made which change. We strongly recommend working with the DSG team to limit administrative access and establish a guided process for tracking changes. This will help us effectively modify and add new monitors in Zabbix.
+
+Please review the points mentioned above and let me know if I have missed anything or if you have any further concerns. Your input and collaboration in resolving these issues are greatly appreciated.
+
+Thank you for your attention to this matter. I look forward to hearing from you soon.
+
+Best regards,
