@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Function to generate the OAuth2 token
+generate_oauth_token() {
+    local url="$1"
+    local scope="$2"
+    local grant_type="$3"
+    local client_id="$4"
+    local client_secret="$5"
+
+    local response=$(curl -s -X POST "$url" \
+        -d "scope=$scope" \
+        -d "grant_type=$grant_type" \
+        -d "client_id=$client_id" \
+        -d "client_secret=$client_secret")
+
+    # Extract the token from the response (assumes the token is returned as a JSON field named "access_token")
+    local token=$(echo "$response" | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
+
+    echo "$token"
+}
+
+# Function to update the Zabbix host macro value using Zabbix API
+update_zabbix_host_macro() {
+    local zabbix_url="$1"
+    local zabbix_username="$2"
+    local zabbix_password="$3"
+    local host_id="$4"
+    local macro_name="$5"
+    local macro_value="$6"
+
+    # Get the Zabbix authentication token
+    local auth_token=$(curl -s -X POST "$zabbix_url/api_jsonrpc.php" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "jsonrpc": "2.0",
+            "method": "user.login",
+            "params": {
+                "user": "'"$zabbix_username"'",
+                "password": "'"$zabbix_password"'"
+            },
+            "id": 1
+        }' | grep -o '"result":"[^"]*' | cut -d'"' -f4)
+
+    # Update the Zabbix host macro value
+    curl -s -X POST "$zabbix_url/api_jsonrpc.php" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "jsonrpc": "2.0",
+            "method": "host.update",
+            "params": {
+                "hostid": "'"$host_id"'",
+                "macros": [
+                    {
+                        "macro": "'"$macro_name"'",
+                        "value": "'"$macro_value"'"
+                    }
+                ]
+            },
+            "auth": "'"$auth_token"'",
+            "id": 1
+        }'
+}
+
+# Main script
+if [ $# -ne 7 ]; then
+    echo "Usage: $0 <OAuth2 URL> <scope> <grant_type> <client_id> <client_secret> <Zabbix URL> <Zabbix Host ID> <macro_name>"
+    exit 1
+fi
+
+# Input parameters
+oauth2_url="$1"
+scope="$2"
+grant_type="$3"
+client_id="$4"
+client_secret="$5"
+zabbix_url="$6"
+host_id="$7"
+macro_name="$8"
+
+# Generate OAuth2 token
+token=$(generate_oauth_token "$oauth2_url" "$scope" "$grant_type" "$client_id" "$client_secret")
+
+# Update Zabbix host macro with the generated token
+update_zabbix_host_macro "$zabbix_url" "your_zabbix_username" "your_zabbix_password" "$host_id" "$macro_name" "$token"
