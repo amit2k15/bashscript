@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Check if expect is installed
+if ! command -v expect &>/dev/null; then
+  echo "Error: 'expect' is required but not installed. Please install expect to continue."
+  exit 1
+fi
+
+# Check for correct number of arguments
+if [ $# -ne 3 ]; then
+  echo "Usage: $0 <SFTP_HOST> <USERNAME> <PASSWORD>"
+  exit 1
+fi
+
+SFTP_HOST="$1"
+USERNAME="$2"
+PASSWORD="$3"
+
+# Expect script to automate SFTP authentication
+expect_script=$(expect -c "
+set timeout 10
+spawn sftp ${USERNAME}@${SFTP_HOST}
+expect {
+  \"(yes/no)?\" {
+    send \"yes\r\"
+    exp_continue
+  }
+  \"password:\" {
+    send \"${PASSWORD}\r\"
+  }
+}
+expect {
+  \"sftp>\" {
+    exit 0
+  }
+  \"Authentication failed\" {
+    exit 1
+  }
+  timeout {
+    exit 2
+  }
+}
+")
+
+# Execute the expect script and get the exit code
+expect_exit_code=$?
+
+# Interpret the exit code and display appropriate message
+case $expect_exit_code in
+  0)
+    echo "SFTP authentication successful!"
+    ;;
+  1)
+    echo "Authentication failed. Please check your credentials."
+    ;;
+  2)
+    echo "Timeout: SFTP connection took too long. Check the host and try again."
+    ;;
+  *)
+    echo "Unknown error occurred."
+    ;;
+esac
