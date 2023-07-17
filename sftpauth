@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Check if all arguments are provided
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <hostname> <username> <password> <sftp_port>"
+    exit 1
+fi
+
+# Assigning arguments to variables
+HOSTNAME=$1
+USERNAME=$2
+PASSWORD=$3
+SFTP_PORT=$4
+
+# Function to check SFTP account authentication status
+check_authentication() {
+    RESPONSE=$(curl -s -w "%{http_code}" -u "${USERNAME}:${PASSWORD}" "sftp://${HOSTNAME}:${SFTP_PORT}" -o /dev/null)
+    if [ "$RESPONSE" == "230" ]; then
+        echo "Authentication successful."
+    else
+        echo "Authentication failed."
+    fi
+}
+
+# Function to check response code
+check_response_code() {
+    RESPONSE=$(curl -s -w "%{http_code}" -u "${USERNAME}:${PASSWORD}" "sftp://${HOSTNAME}:${SFTP_PORT}" -o /dev/null)
+    echo "Response code: $RESPONSE"
+}
+
+# Function to check response time
+check_response_time() {
+    RESPONSE_TIME=$( { time curl -s -o /dev/null -u "${USERNAME}:${PASSWORD}" "sftp://${HOSTNAME}:${SFTP_PORT}"; } 2>&1 | grep real | awk '{print $2}' )
+    echo "Response time: $RESPONSE_TIME"
+}
+
+# Calling the functions
+check_authentication
+check_response_code
+check_response_time
