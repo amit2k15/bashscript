@@ -1,42 +1,42 @@
 #!/bin/bash
 
-# Check if the required number of arguments are provided
+# Check if all required arguments are provided
 if [ "$#" -ne 4 ]; then
     echo "Usage: $0 <hostname> <username> <password> <sftp_port>"
     exit 1
 fi
 
-# Assign arguments to variables
-hostname=$1
-username=$2
-password=$3
-sftp_port=$4
+# Extract arguments
+hostname="$1"
+username="$2"
+password="$3"
+sftp_port="$4"
 
-# Function to check SFTP connection and get response code and time
-function check_sftp_connection() {
-    local response_code
-    local response_time
+# Function to test SFTP authentication and measure response time
+function test_sftp {
+    local start_time=$(date +%s.%N)
+    sftp_response=$(sftp -oBatchMode=yes -oStrictHostKeyChecking=no -P "$sftp_port" "$username"@"$hostname" <<< "ls" 2>&1)
+    local end_time=$(date +%s.%N)
 
-    # Measure the response time using 'time' command and capture the exit status
-    { time -p sftp -oPort="$sftp_port" -oBatchMode=yes -oStrictHostKeyChecking=no "$username"@"$hostname" &>/dev/null; } 2> >(grep real | awk '{print $2}' > response_time.txt)
-    response_time=$(cat response_time.txt)
+    local response_code=$?
+    local response_time=$(echo "$end_time - $start_time" | bc)
 
-    # Capture the exit status (response code) of the 'sftp' command
-    response_code=$?
-
-    # Output the results
-    echo "SFTP Account Authentication Status:"
-    if [ "$response_code" -eq 0 ]; then
-        echo "Authentication successful (Exit code: $response_code)"
-    else
-        echo "Authentication failed (Exit code: $response_code)"
-    fi
-
-    echo "SFTP Server Response Time: $response_time seconds"
+    echo "$response_code"
+    echo "$response_time"
+    echo "$sftp_response"
 }
 
-# Call the function to check the SFTP connection
-check_sftp_connection
+# Execute the function and capture the output
+response_code=$(test_sftp)
 
-# Clean up temporary files
-rm -f response_time.txt
+# Output the results
+echo "SFTP Account Authentication Status:"
+if [ "$response_code" -eq 0 ]; then
+    echo "Success"
+else
+    echo "Failed"
+fi
+
+echo "SFTP Response Code: $response_code"
+
+echo "SFTP Response Time: $response_time seconds"
