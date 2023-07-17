@@ -1,0 +1,21 @@
+Self healing using Zabbix allow us to execute predefined scripts or custom commands on remote hosts that are being monitored by Zabbix. These commands can be triggered manually or as part of a Zabbix action, based on specific triggers or events.
+
+Automation and Remediation: Zabbix remote commands enable you to automate various actions and remediation tasks based on specific triggers or events. For example, you can automatically restart a service, clear cache, or execute a script on a remote host when a certain threshold is exceeded or when an issue is detected.
+
+Efficiency: Instead of manually logging into each individual server or device to perform tasks, remote commands allow you to execute actions across multiple hosts simultaneously, saving time and effort in managing the infrastructure.
+
+Real-time Responses: With remote commands, you can respond quickly to critical events or incidents. When a problem is detected, you can trigger immediate actions to mitigate the issue without waiting for manual intervention.
+
+Reduced Downtime: The ability to execute remote commands helps in reducing downtime. For instance, if a service goes down, you can remotely restart it promptly, minimizing the impact on users and applications.
+
+Centralized Management: Zabbix provides a centralized interface to manage and execute commands on various hosts. This makes it easier to maintain and control multiple systems from a single location.
+
+Secure Communication: Zabbix employs encryption and secure communication channels to send remote commands, ensuring that sensitive information is protected during the execution of commands.
+
+Customizability: Remote commands in Zabbix can be customized to suit your specific requirements. You can create custom scripts and actions to handle complex scenarios tailored to your environment.
+
+Scalability: Zabbix is designed to handle large-scale infrastructures, and remote commands are no exception. You can scale the usage of remote commands to manage a vast number of devices and hosts effectively.
+
+Historical Tracking: Zabbix logs all executed remote commands, providing an audit trail of actions taken, which can be valuable for troubleshooting and compliance purposes.
+
+Integration with Other Tools: Zabbix can be integrated with other IT management and automation tools, enabling you to extend the capabilities of remote commands and integrate them into your existing workflows.
