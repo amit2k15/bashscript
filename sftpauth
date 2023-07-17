@@ -1,53 +1,42 @@
 #!/bin/bash
 
-# Check if all required arguments are provided
-if [ $# -ne 4 ]; then
-  echo "Usage: $0 <hostname> <username> <password> <sftp_port>"
-  exit 1
+# Check if the required number of arguments are provided
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <hostname> <username> <password> <sftp_port>"
+    exit 1
 fi
 
-# Assign command-line arguments to variables
+# Assign arguments to variables
 hostname=$1
 username=$2
 password=$3
 sftp_port=$4
 
-# Temporary file to store the sftp commands
-commands_file=$(mktemp)
+# Function to check SFTP connection and get response code and time
+function check_sftp_connection() {
+    local response_code
+    local response_time
 
-# Generate sftp commands file
-cat << EOF > "$commands_file"
-open $hostname $sftp_port
-user $username $password
-bye
-EOF
+    # Measure the response time using 'time' command and capture the exit status
+    { time -p sftp -oPort="$sftp_port" -oBatchMode=yes -oStrictHostKeyChecking=no "$username"@"$hostname" &>/dev/null; } 2> >(grep real | awk '{print $2}' > response_time.txt)
+    response_time=$(cat response_time.txt)
 
-# Run sftp and capture the output
-output=$(sftp -b "$commands_file" 2>&1)
+    # Capture the exit status (response code) of the 'sftp' command
+    response_code=$?
 
-# Parse the output to extract authentication status, response code, and response time
-authentication_status=""
-response_code=""
-response_time=""
+    # Output the results
+    echo "SFTP Account Authentication Status:"
+    if [ "$response_code" -eq 0 ]; then
+        echo "Authentication successful (Exit code: $response_code)"
+    else
+        echo "Authentication failed (Exit code: $response_code)"
+    fi
 
-if echo "$output" | grep -q "Authentication successful"; then
-  authentication_status="Authenticated"
-  response_code="0"
-else
-  authentication_status="Not Authenticated"
-  response_code="1"
-fi
+    echo "SFTP Server Response Time: $response_time seconds"
+}
 
-if echo "$output" | grep -q "timed out"; then
-  response_time="Timed out"
-else
-  response_time="Normal"
-fi
+# Call the function to check the SFTP connection
+check_sftp_connection
 
-# Clean up the temporary commands file
-rm "$commands_file"
-
-# Print the results
-echo "Authentication Status: $authentication_status"
-echo "Response Code: $response_code"
-echo "Response Time: $response_time"
+# Clean up temporary files
+rm -f response_time.txt
