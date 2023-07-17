@@ -1,0 +1,61 @@
+#!/bin/bash
+
+ZABBIX_URL="http://your-zabbix-server/api_jsonrpc.php"
+ZABBIX_USERNAME="your_zabbix_username"
+ZABBIX_PASSWORD="your_zabbix_password"
+HOST_ID="your_host_id"
+MACRO_NAME="your_macro_name"
+NEW_MACRO_VALUE="your_new_macro_value"
+
+# Authenticate and get an authentication token from Zabbix API
+auth_token=$(curl -s -X POST -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0",
+  "method": "user.login",
+  "params": {
+    "user": "'$ZABBIX_USERNAME'",
+    "password": "'$ZABBIX_PASSWORD'"
+  },
+  "id": 1
+}' $ZABBIX_URL | jq -r '.result')
+
+if [ -z "$auth_token" ]; then
+  echo "Failed to authenticate with Zabbix API. Please check your credentials and Zabbix server URL."
+  exit 1
+fi
+
+# Get the current macros of the host
+macros=$(curl -s -X POST -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0",
+  "method": "host.get",
+  "params": {
+    "output": ["hostid"],
+    "selectMacros": ["macro", "value"],
+    "filter": {
+      "hostid": "'$HOST_ID'"
+    }
+  },
+  "auth": "'$auth_token'",
+  "id": 2
+}' $ZABBIX_URL | jq '.result[0].macros')
+
+if [ -z "$macros" ]; then
+  echo "Failed to retrieve macros for the specified host. Please check the host ID."
+  exit 1
+fi
+
+# Update the value of the specified macro
+updated_macros=$(echo $macros | jq --arg MACRO_NAME "$MACRO_NAME" --arg NEW_VALUE "$NEW_MACRO_VALUE" 'map(if .macro == $MACRO_NAME then . + { "value": $NEW_VALUE } else . end)')
+
+# Send the updated macros to Zabbix API
+curl -s -X POST -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0",
+  "method": "host.update",
+  "params": {
+    "hostid": "'$HOST_ID'",
+    "macros": '$updated_macros'
+  },
+  "auth": "'$auth_token'",
+  "id": 3
+}' $ZABBIX_URL
+
+echo "Macro '$MACRO_NAME' updated with the new value: $NEW_MACRO_VALUE"
