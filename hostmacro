@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Zabbix API credentials
+ZABBIX_API_URL="http://your_zabbix_server/api_jsonrpc.php"
+ZABBIX_API_USER="your_api_user"
+ZABBIX_API_PASSWORD="your_api_password"
+
+# Zabbix host and macro details
+HOSTNAME="your_host_name"
+MACRO_NAME="your_macro_name"
+MACRO_VALUE="your_macro_value"
+
+# Authenticate and obtain authentication token
+AUTH_TOKEN=$(curl -s -X POST -H 'Content-Type: application/json-rpc' -d '{
+  "jsonrpc": "2.0",
+  "method": "user.login",
+  "params": {
+    "user": "'"$ZABBIX_API_USER"'",
+    "password": "'"$ZABBIX_API_PASSWORD"'"
+  },
+  "id": 1,
+  "auth": null
+}' $ZABBIX_API_URL | jq -r '.result')
+
+# Retrieve host ID based on the hostname
+HOST_ID=$(curl -s -X POST -H 'Content-Type: application/json-rpc' -d '{
+  "jsonrpc": "2.0",
+  "method": "host.get",
+  "params": {
+    "output": ["hostid"],
+    "filter": {
+      "host": ["'"$HOSTNAME"'"]
+    }
+  },
+  "auth": "'"$AUTH_TOKEN"'",
+  "id": 2
+}' $ZABBIX_API_URL | jq -r '.result[0].hostid')
+
+# Update host macro with the new value
+curl -s -X POST -H 'Content-Type: application/json-rpc' -d '{
+  "jsonrpc": "2.0",
+  "method": "host.update",
+  "params": {
+    "hostid": "'"$HOST_ID"'",
+    "macros": [
+      {
+        "macro": "'"$MACRO_NAME"'",
+        "value": "'"$MACRO_VALUE"'"
+      }
+    ]
+  },
+  "auth": "'"$AUTH_TOKEN"'",
+  "id": 3
+}' $ZABBIX_API_URL
