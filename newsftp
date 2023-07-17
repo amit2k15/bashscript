@@ -1,41 +1,91 @@
 #!/bin/bash
 
-# Function to check SFTP authentication
-function check_sftp_authentication() {
-    local host="$1"
-    local user="$2"
+# Function to check SFTP account authentication
+check_authentication() {
+    local hostname="$1"
+    local username="$2"
     local password="$3"
     local port="$4"
 
-    # Attempt SFTP connection and check the exit code
-    sftp_output=$(sshpass -p "$password" sftp -oPort="$port" -oBatchMode=yes "$user"@"$host" 2>&1)
-    exit_code=$?
+    # Attempt to connect and authenticate using sftp
+    sftp_response=$(expect -c "
+        spawn sftp -oPort=$port $username@$hostname
+        expect {
+            \"assword:\" {
+                send \"$password\r\"
+                expect {
+                    \"sftp>\" {
+                        send \"exit\r\"
+                        expect eof
+                        exit 0
+                    }
+                    \"denied\" {
+                        exit 1
+                    }
+                    \"refused\" {
+                        exit 2
+                    }
+                    timeout {
+                        exit 3
+                    }
+                    eof {
+                        exit 4
+                    }
+                }
+            }
+            \"Are you sure you want to continue\" {
+                send \"yes\r\"
+                exp_continue
+            }
+            timeout {
+                exit 5
+            }
+            eof {
+                exit 6
+            }
+        }
+    ")
 
-    if [ $exit_code -eq 0 ]; then
-        echo "SFTP authentication successful for $user@$host:$port"
-    else
-        echo "SFTP authentication failed for $user@$host:$port"
-        echo "Error message: $sftp_output"
-    fi
+    case "$?" in
+        0)
+            echo "Authentication succeeded."
+            ;;
+        1)
+            echo "Authentication failed. Check username and password."
+            ;;
+        2)
+            echo "Connection refused. Check the SFTP port or hostname."
+            ;;
+        3)
+            echo "Connection timeout."
+            ;;
+        4)
+            echo "Unexpected EOF while authenticating."
+            ;;
+        5)
+            echo "Timeout while waiting for response."
+            ;;
+        6)
+            echo "EOF while waiting for response."
+            ;;
+        *)
+            echo "Unknown error occurred."
+            ;;
+    esac
 }
 
-# Main script
-
-# Check if sshpass is installed
-if ! command -v sshpass &>/dev/null; then
-    echo "sshpass is not installed. Please install it before running this script."
-    exit 1
-fi
-
-# Check if all required arguments are provided
+# Main script starts here
 if [ $# -ne 4 ]; then
-    echo "Usage: $0 <SFTP_HOST> <SFTP_USER> <SFTP_PASSWORD> <SFTP_PORT>"
+    echo "Usage: $0 <hostname> <username> <password> <sftp_port>"
     exit 1
 fi
 
-SFTP_HOST="$1"
-SFTP_USER="$2"
-SFTP_PASSWORD="$3"
-SFTP_PORT="$4"
+hostname="$1"
+username="$2"
+password="$3"
+port="$4"
 
-check_sftp_authentication "$SFTP_HOST" "$SFTP_USER" "$SFTP_PASSWORD" "$SFTP_PORT"
+# Measure response time using the time utility
+response_time=$( { time -p check_authentication "$hostname" "$username" "$password" "$port"; } 2>&1 | grep real | awk '{print $2}' )
+
+echo "Response time: $response_time seconds."
