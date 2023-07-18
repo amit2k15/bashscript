@@ -1,74 +1,22 @@
 import os
-import subprocess
-import requests
 from envelope import Envelope
 
-def execute_script(script_path):
-    try:
-        subprocess.run(["python", script_path], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Error executing script {script_path}: {e}")
+# Create a new envelope
+env = Envelope(
+    from_addr=("sender@example.com", "Sender"),
+    to_addr=("recipient@example.com", "Recipient"),
+    subject="Excel Files"
+)
 
-def send_email_with_attachment(sender, recipient, subject, body, attachment_path):
-    url = "https://api.sendinblue.com/v3/smtp/email"
-    api_key = "YOUR_SENDINBLUE_API_KEY"
-    headers = {
-        "Accept": "application/json",
-        "api-key": api_key,
-    }
-    payload = {
-        "sender": {"name": sender, "email": "noreply@example.com"},
-        "to": [{"email": recipient}],
-        "subject": subject,
-        "htmlContent": body,
-    }
+# Attach the Excel files
+env.attach_file("path/to/excel/file1.xlsx")
+env.attach_file("path/to/excel/file2.xlsx")
+env.attach_file("path/to/excel/file3.xlsx")
+env.attach_file("path/to/excel/file4.xlsx")
 
-    with open(attachment_path, "rb") as f:
-        files = [("attachment", f)]
-        response = requests.post(url, headers=headers, data=payload, files=files)
+# Set the SMTP server details
+env.smtp("smtp.example.com", 587)
+env.login("sender@example.com")
 
-    if response.status_code == 201:
-        print("Email sent successfully!")
-    else:
-        print("Failed to send email.")
-        print(response.text)
-
-if __name__ == "__main__":
-    # Replace these values with your email settings
-    sender_email = "your_email@example.com"
-    recipient_email = "recipient_email@example.com"
-    email_subject = "Excel Sheets Report"
-    email_body = "Please find the attached Excel sheets."
-
-    # Replace these paths with the paths to your Python scripts and generated Excel sheets
-    script_paths = [
-        "path/to/first_script.py",
-        "path/to/second_script.py",
-        "path/to/third_script.py",
-        "path/to/fourth_script.py",
-    ]
-    excel_sheet_paths = [
-        "path/to/first_script_output.xlsx",
-        "path/to/second_script_output.xlsx",
-        "path/to/third_script_output.xlsx",
-        "path/to/fourth_script_output.xlsx",
-    ]
-
-    for script_path in script_paths:
-        execute_script(script_path)
-
-    envelope = Envelope(
-        from_addr=(sender_email, "Your Name"),
-        to_addr=(recipient_email, "Recipient Name"),
-        subject=email_subject,
-        text_body=email_body,
-    )
-
-    for excel_sheet_path in excel_sheet_paths:
-        if os.path.exists(excel_sheet_path):
-            envelope.add_attachment(excel_sheet_path)
-
-    envelope.send("smtp://localhost:1025")  # You can use any valid SMTP server here
-
-    for excel_sheet_path in excel_sheet_paths:
-        os.remove(excel_sheet_path)  # Remove the temporary files after sending the email
+# Send the email
+env.send()
