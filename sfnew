@@ -1,45 +1,54 @@
-#!/usr/bin/expect
+#!/usr/bin/expect -f
 
-# Check if all required arguments are provided
-if {$argc != 4} {
-    puts "Usage: $argv0 <host> <port> <user> <password>"
+# Check if all the required arguments are provided
+if {$argc < 3} {
+    puts "Usage: $argv0 host port user"
     exit 1
 }
 
-# Assign command-line arguments to variables
+# Assign the arguments to variables
 set host [lindex $argv 0]
 set port [lindex $argv 1]
 set user [lindex $argv 2]
-set password [lindex $argv 3]
 
-# Command to check SFTP authentication
-set sftp_command "sftp -P $port $user@$host"
+# Function to handle the sftp authentication process
+proc monitor_sftp_auth {host port user} {
+    set timeout 30
+    spawn sftp -P $port $user@$host
 
-# Spawn the sftp command
-spawn $sftp_command
+    expect {
+        # Check if the authenticity of the host is unknown (ask yes/no)
+        "The authenticity of host" {
+            send "yes\r"
+            exp_continue
+        }
 
-# Look for specific patterns to handle different scenarios
-expect {
-    # If prompted for a password, send the password
-    "password:" {
-        send "$password\r"
-        exp_continue
+        # Check if it prompts for a password
+        "password:" {
+            # Enter the password here or you can prompt the user for input if needed
+            send "your_password_here\r"
+        }
+
+        # Check if authentication is successful
+        "sftp>" {
+            puts "Authentication successful!"
+            send "exit\r"  ;# Exit the SFTP session
+        }
+
+        # Check if authentication fails
+        "Permission denied" {
+            puts "Authentication failed!"
+        }
+
+        # Handle unexpected cases
+        timeout {
+            puts "Timed out while waiting for response."
+            exit 1
+        }
     }
-    # If the connection is successful, print a success message
-    "sftp>" {
-        puts "SFTP authentication successful!"
-    }
-    # If authentication fails, print an error message
-    "Permission denied, please try again." {
-        puts "Authentication failed. Please check your credentials."
-        exit 1
-    }
-    # If some other unexpected output occurs, print an error message
-    default {
-        puts "Error: Unexpected output. Please check your inputs and try again."
-        exit 1
-    }
+
+    expect eof
 }
 
-# Wait for the command to finish
-expect eof
+# Call the function with provided arguments
+monitor_sftp_auth $host $port $user
