@@ -1,35 +1,34 @@
 #!/bin/bash
 
-if [ "$#" -ne 4 ]; then
-  echo "Usage: $0 <host> <user> <password> <port>"
-  exit 1
-fi
+# Set the SFTP connection details
+host="$1"
+user="$2"
+password="$3"
+port="$4"
 
-HOST=$1
-USER=$2
-PASSWORD=$3
-PORT=$4
+# Enable non-interactive mode for password prompt
+export SSHPASS="$password"
 
-expect <<EOF
-spawn sftp -P $PORT $USER@$HOST
+# Define the SFTP command
+sftp_command="sftp -P $port $user@$host"
+
+# Execute the SFTP command
+$result=$(expect -c "
+spawn $sftp_command
 expect {
-  "yes/no" {
-    send "yes\r"
-    exp_continue
-  }
-  "password:" {
-    send "$PASSWORD\r"
-  }
-}
-expect {
-  "Authentication failed." {
-    puts "Authentication failed."
-    exit 1
-  }
-  "sftp>" {
-    puts "Authentication successful."
-    send "exit\r"
-  }
+    \"*(yes/no)?\" {
+        send \"yes\r\"
+        exp_continue
+    }
+    \"*password:\" {
+        send \"$password\r\"
+    }
 }
 expect eof
-EOF
+")
+
+# Print the result
+echo "$result"
+
+# Exit the script
+exit
