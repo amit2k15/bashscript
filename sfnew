@@ -1,44 +1,39 @@
 #!/bin/bash
 
-# Function to monitor SFTP authentication
-function monitor_sftp_auth {
-    host="$1"
-    port="$2"
-    user="$3"
-    password="$4"
-
-    # Run SFTP command using expect to automate the authentication
-    expect -c "
-        spawn sftp -oPort=$port $user@$host
-        expect {
-            \"Are you sure you want to continue connecting\" {
-                send \"yes\r\"
-                exp_continue
-            }
-            \"password:\" {
-                send \"$password\r\"
-                exp_continue
-            }
-            \"sftp>\" {
-                send \"exit\r\"
-            }
-        }
-        interact
-    "
-}
-
-# Check if expect is installed
-if ! command -v expect &>/dev/null; then
-    echo "Error: expect is not installed. Please install expect to use this script."
-    exit 1
+# Check if all required arguments are provided
+if [ $# -ne 4 ]; then
+  echo "Usage: $0 <sftp_host> <sftp_port> <sftp_user> <sftp_password>"
+  exit 1
 fi
 
-# Get input from the user
-read -p "Enter SFTP host: " host
-read -p "Enter SFTP port: " port
-read -p "Enter SFTP user: " user
-read -s -p "Enter SFTP password: " password
-echo # Newline after password input
+# Assign arguments to variables
+sftp_host=$1
+sftp_port=$2
+sftp_user=$3
+sftp_password=$4
 
-# Call the function with provided input
-monitor_sftp_auth "$host" "$port" "$user" "$password"
+# Define the SFTP command
+sftp_cmd="sshpass -p '$sftp_password' sftp -oPort=$sftp_port $sftp_user@$sftp_host"
+
+# Function to monitor authentication
+monitor_authentication() {
+  while true; do
+    # Execute the SFTP command and capture the output
+    result=$(eval "$sftp_cmd" 2>&1)
+
+    # Check if authentication was successful or failed
+    if echo "$result" | grep -q "Authentication succeeded"; then
+      echo "Authentication successful!"
+      break
+    elif echo "$result" | grep -q "Permission denied"; then
+      echo "Authentication failed!"
+      break
+    fi
+
+    # Wait for a few seconds before trying again
+    sleep 5
+  done
+}
+
+# Call the function to monitor authentication
+monitor_authentication
