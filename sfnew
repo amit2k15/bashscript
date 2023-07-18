@@ -1,54 +1,32 @@
-#!/usr/bin/expect -f
+#!/bin/bash
 
-# Check if all the required arguments are provided
-if {$argc < 3} {
-    puts "Usage: $argv0 host port user"
-    exit 1
-}
+# Check if all required arguments are provided
+if [[ $# -ne 4 ]]; then
+  echo "Usage: $0 <host> <port> <user> <password>"
+  exit 1
+fi
 
-# Assign the arguments to variables
-set host [lindex $argv 0]
-set port [lindex $argv 1]
-set user [lindex $argv 2]
+# Read input arguments
+host=$1
+port=$2
+user=$3
+password=$4
 
-# Function to handle the sftp authentication process
-proc monitor_sftp_auth {host port user} {
-    set timeout 30
-    spawn sftp -P $port $user@$host
+# Escape any special characters in the password to avoid issues with 'expect'
+escaped_password=$(printf '%s\n' "$password" | sed -e 's/[]\/$*.^[]/\\&/g')
 
-    expect {
-        # Check if the authenticity of the host is unknown (ask yes/no)
-        "The authenticity of host" {
-            send "yes\r"
-            exp_continue
-        }
-
-        # Check if it prompts for a password
-        "password:" {
-            # Enter the password here or you can prompt the user for input if needed
-            send "your_password_here\r"
-        }
-
-        # Check if authentication is successful
-        "sftp>" {
-            puts "Authentication successful!"
-            send "exit\r"  ;# Exit the SFTP session
-        }
-
-        # Check if authentication fails
-        "Permission denied" {
-            puts "Authentication failed!"
-        }
-
-        # Handle unexpected cases
-        timeout {
-            puts "Timed out while waiting for response."
-            exit 1
-        }
+# Use 'expect' to interact with 'sftp' and handle host key verification prompt
+expect -c "
+  set timeout 10
+  spawn sftp -P $port $user@$host
+  expect {
+    \"Are you sure you want to continue connecting (yes/no)?\" {
+      send \"yes\r\"
+      exp_continue
     }
-
-    expect eof
-}
-
-# Call the function with provided arguments
-monitor_sftp_auth $host $port $user
+    \"password:\" {
+      send \"$escaped_password\r\"
+    }
+  }
+  interact
+"
