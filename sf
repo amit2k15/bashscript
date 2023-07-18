@@ -1,64 +1,6 @@
 #!/bin/bash
 
-# Function to check SFTP account authentication status
-check_sftp_authentication() {
-    hostname=$1
-    username=$2
-    password=$3
-    port=$4
-
-    # Create a temporary script file to execute sftp command
-    tmp_script=$(mktemp)
-    cat > "$tmp_script" <<EOF
-    set -o BatchMode=yes
-    spawn sftp -P $port $username@$hostname
-    expect {
-        "password:" {
-            send "$password\n"
-            expect {
-                "sftp>" { exit 0; }
-                "Permission denied" { exit 1; }
-            }
-        }
-        timeout { exit 2; }
-    }
-EOF
-
-    # Execute the temporary script with expect
-    expect_result=$(expect -f "$tmp_script")
-    exit_code=$?
-
-    # Clean up the temporary script file
-    rm "$tmp_script"
-
-    # Check the result and print the status
-    if [ $exit_code -eq 0 ]; then
-        echo "Authentication successful"
-    elif [ $exit_code -eq 1 ]; then
-        echo "Authentication failed: Incorrect username or password"
-    elif [ $exit_code -eq 2 ]; then
-        echo "Authentication failed: Connection timed out"
-    else
-        echo "Error occurred during authentication"
-    fi
-}
-
-# Function to check response code and response time
-check_response() {
-    hostname=$1
-    port=$2
-
-    # Use curl to perform a HEAD request and capture the response code and time
-    response=$(curl -o /dev/null -s -w "%{http_code} %{time_total}\n" "sftp://$hostname:$port/")
-    response_code=$(echo "$response" | awk '{print $1}')
-    response_time=$(echo "$response" | awk '{print $2}')
-
-    echo "Response code: $response_code"
-    echo "Response time (seconds): $response_time"
-}
-
-# Main script starts here
-if [ $# -ne 4 ]; then
+if [[ $# -ne 4 ]]; then
     echo "Usage: $0 <hostname> <username> <password> <port>"
     exit 1
 fi
@@ -68,5 +10,60 @@ username=$2
 password=$3
 port=$4
 
-check_sftp_authentication "$hostname" "$username" "$password" "$port"
-check_response "$hostname" "$port"
+# Check authentication status
+auth_result=$(expect -c "
+spawn sftp -oBatchMode=no -oPort=$port $username@$hostname
+expect {
+    \"assword:\" {
+        send \"$password\n\"
+        expect {
+            \"sftp>\" {
+                exit 0
+            }
+            \"Permission denied\" {
+                exit 1
+            }
+        }
+    }
+    \"Connection refused\" {
+        exit 2
+    }
+    \"No route to host\" {
+        exit 3
+    }
+    timeout {
+        exit 4
+    }
+}
+")
+
+auth_status=$?
+
+# Check response time
+response_time=$( { time -p (echo "quit" | sftp -oBatchMode=no -oPort=$port $username@$hostname &>/dev/null); } 2>&1 | grep real | awk '{print $2}' )
+
+# Output results
+echo "Authentication Status: "
+case $auth_status in
+    0)
+        echo "Success"
+        ;;
+    1)
+        echo "Failure: Incorrect username or password"
+        ;;
+    2)
+        echo "Failure: Connection refused"
+        ;;
+    3)
+        echo "Failure: No route to host"
+        ;;
+    4)
+        echo "Failure: Timeout"
+        ;;
+    *)
+        echo "Unknown error"
+        ;;
+esac
+
+echo "Response Code: $auth_status"
+echo "Response Time: $response_time seconds"
