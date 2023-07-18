@@ -1,69 +1,39 @@
-#!/bin/bash
+#!/usr/bin/expect -f
 
-if [[ $# -ne 4 ]]; then
-    echo "Usage: $0 <hostname> <username> <password> <port>"
+# Check if all arguments are provided
+if {[llength $argv] != 4} {
+    puts "Usage: $argv0 <SFTP_HOST> <SFTP_USER> <SFTP_PASSWORD> <SFTP_PORT>"
     exit 1
-fi
+}
 
-hostname=$1
-username=$2
-password=$3
-port=$4
+# Assign command-line arguments to variables
+set sftp_host [lindex $argv 0]
+set sftp_user [lindex $argv 1]
+set sftp_password [lindex $argv 2]
+set sftp_port [lindex $argv 3]
 
-# Check authentication status
-auth_result=$(expect -c "
-spawn sftp -oBatchMode=no -oPort=$port $username@$hostname
+# Timeout value (adjust as needed)
+set timeout 10
+
+# Spawn SFTP and attempt authentication
+spawn sftp -oPort=$sftp_port $sftp_user@$sftp_host
+
+# Expect the password prompt and send the password
+expect "password:"
+send "$sftp_password\r"
+
+# Expect the SFTP prompt to determine authentication status
 expect {
-    \"assword:\" {
-        send \"$password\n\"
-        expect {
-            \"sftp>\" {
-                exit 0
-            }
-            \"Permission denied\" {
-                exit 1
-            }
-        }
+    "sftp>" {
+        puts "Authentication successful!"
+        exit 0
     }
-    \"Connection refused\" {
-        exit 2
-    }
-    \"No route to host\" {
-        exit 3
+    "Permission denied" {
+        puts "Authentication failed."
+        exit 1
     }
     timeout {
-        exit 4
+        puts "Timeout: Unable to connect or authenticate."
+        exit 2
     }
 }
-")
-
-auth_status=$?
-
-# Check response time
-response_time=$( { time -p (echo "quit" | sftp -oBatchMode=no -oPort=$port $username@$hostname &>/dev/null); } 2>&1 | grep real | awk '{print $2}' )
-
-# Output results
-echo "Authentication Status: "
-case $auth_status in
-    0)
-        echo "Success"
-        ;;
-    1)
-        echo "Failure: Incorrect username or password"
-        ;;
-    2)
-        echo "Failure: Connection refused"
-        ;;
-    3)
-        echo "Failure: No route to host"
-        ;;
-    4)
-        echo "Failure: Timeout"
-        ;;
-    *)
-        echo "Unknown error"
-        ;;
-esac
-
-echo "Response Code: $auth_status"
-echo "Response Time: $response_time seconds"
