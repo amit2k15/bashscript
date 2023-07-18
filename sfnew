@@ -1,34 +1,38 @@
-#!/bin/bash
+#!/usr/bin/expect -f
 
-# Set the SFTP connection details
-host="$1"
-user="$2"
-password="$3"
-port="$4"
+# Check if all required arguments are provided
+if {$argc != 4} {
+    puts "Usage: $argv0 <sftp_host> <sftp_user> <sftp_password> <sftp_port>"
+    exit 1
+}
 
-# Enable non-interactive mode for password prompt
-export SSHPASS="$password"
+# Assign arguments to variables
+set sftp_host [lindex $argv 0]
+set sftp_user [lindex $argv 1]
+set sftp_password [lindex $argv 2]
+set sftp_port [lindex $argv 3]
 
-# Define the SFTP command
-sftp_command="sftp -P $port $user@$host"
+# Spawn the sftp process
+spawn sftp -P $sftp_port $sftp_user@$sftp_host
 
-# Execute the SFTP command
-$result=$(expect -c "
-spawn $sftp_command
+# Expect the password prompt and send the password
+expect "password:"
+send "$sftp_password\r"
+
+# Allow handling the "yes/no" prompt for adding the host to known_hosts
 expect {
-    \"*(yes/no)?\" {
-        send \"yes\r\"
+    "yes/no" {
+        send "yes\r"
         exp_continue
     }
-    \"*password:\" {
-        send \"$password\r\"
-    }
 }
+
+# Wait for the sftp prompt and print the result
+expect "sftp>"
+puts "SFTP authentication successful."
+
+# Exit the sftp session
+send "exit\r"
+
+# Wait for the sftp session to end and close the process
 expect eof
-")
-
-# Print the result
-echo "$result"
-
-# Exit the script
-exit
