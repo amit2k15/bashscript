@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Check if all required environment variables are set
+if [ -z "$SFTP_HOST" ] || [ -z "$SFTP_PORT" ] || [ -z "$SFTP_USER" ] || [ -z "$SFTP_PASSWORD" ]; then
+  echo "Please set the SFTP_HOST, SFTP_PORT, SFTP_USER, and SFTP_PASSWORD environment variables."
+  exit 1
+fi
+
+# Command to perform SFTP authentication and check status
+check_sftp_authentication() {
+  local host="$1"
+  local port="$2"
+  local user="$3"
+  local password="$4"
+
+  # Suppressing the output of sftp and capturing the exit code
+  sftp_output=$(expect -c "
+    spawn sftp -oStrictHostKeyChecking=no -oPort=$port $user@$host
+    expect {
+      \"Password:\" {
+        send \"$password\r\"
+        interact
+      }
+      \"Are you sure you want to continue connecting\" {
+        send \"yes\r\"
+        expect \"Password:\"
+        send \"$password\r\"
+        interact
+      }
+      timeout {
+        exit 1
+      }
+    }
+  " 2>/dev/null)
+
+  # Check if sftp authentication was successful
+  if [ $? -eq 0 ]; then
+    echo "SFTP authentication successful."
+  else
+    echo "SFTP authentication failed."
+  fi
+}
+
+# Call the function to check SFTP authentication
+check_sftp_authentication "$SFTP_HOST" "$SFTP_PORT" "$SFTP_USER" "$SFTP_PASSWORD"
