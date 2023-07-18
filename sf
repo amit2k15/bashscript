@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Function to check SFTP account authentication
+function check_sftp_authentication() {
+    local hostname="$1"
+    local username="$2"
+    local password="$3"
+    local port="$4"
+
+    # Attempt SFTP connection and capture the output
+    output=$(echo "ls" | sftp -oPort="$port" -oStrictHostKeyChecking=no "$username"@"$hostname" 2>&1)
+
+    # Check if authentication was successful
+    if echo "$output" | grep -q "Connected to $hostname"; then
+        echo "SFTP account authentication: Successful"
+        return 0
+    else
+        echo "SFTP account authentication: Failed"
+        return 1
+    fi
+}
+
+# Function to check response code and response time
+function check_sftp_response() {
+    local hostname="$1"
+    local port="$2"
+
+    # Use curl to perform a simple HEAD request on the SFTP server
+    response=$(curl --head --silent --output /dev/null --write-out '%{http_code}' "sftp://$hostname:$port")
+
+    echo "SFTP response code: $response"
+
+    # Measure response time using the time command
+    response_time=$( (time -p curl --head --silent --output /dev/null "sftp://$hostname:$port") 2>&1 | grep "real" | awk '{print $2}' )
+    echo "SFTP response time: $response_time seconds"
+}
+
+# Main script execution
+if [[ $# -ne 4 ]]; then
+    echo "Usage: $0 <hostname> <username> <password> <sftp_port>"
+    exit 1
+fi
+
+hostname="$1"
+username="$2"
+password="$3"
+port="$4"
+
+# Check SFTP account authentication status
+check_sftp_authentication "$hostname" "$username" "$password" "$port"
+
+# Check SFTP response code and response time
+check_sftp_response "$hostname" "$port"
