@@ -1,32 +1,35 @@
 #!/bin/bash
 
-# Check if all required arguments are provided
-if [[ $# -ne 4 ]]; then
-  echo "Usage: $0 <host> <port> <user> <password>"
+if [ "$#" -ne 4 ]; then
+  echo "Usage: $0 <host> <user> <password> <port>"
   exit 1
 fi
 
-# Read input arguments
-host=$1
-port=$2
-user=$3
-password=$4
+HOST=$1
+USER=$2
+PASSWORD=$3
+PORT=$4
 
-# Escape any special characters in the password to avoid issues with 'expect'
-escaped_password=$(printf '%s\n' "$password" | sed -e 's/[]\/$*.^[]/\\&/g')
-
-# Use 'expect' to interact with 'sftp' and handle host key verification prompt
-expect -c "
-  set timeout 10
-  spawn sftp -P $port $user@$host
-  expect {
-    \"Are you sure you want to continue connecting (yes/no)?\" {
-      send \"yes\r\"
-      exp_continue
-    }
-    \"password:\" {
-      send \"$escaped_password\r\"
-    }
+expect <<EOF
+spawn sftp -P $PORT $USER@$HOST
+expect {
+  "yes/no" {
+    send "yes\r"
+    exp_continue
   }
-  interact
-"
+  "password:" {
+    send "$PASSWORD\r"
+  }
+}
+expect {
+  "Authentication failed." {
+    puts "Authentication failed."
+    exit 1
+  }
+  "sftp>" {
+    puts "Authentication successful."
+    send "exit\r"
+  }
+}
+expect eof
+EOF
