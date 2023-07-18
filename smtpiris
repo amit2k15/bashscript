@@ -1,0 +1,36 @@
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+import os
+
+# Paths to the Python scripts and Excel files
+scripts = ['script1.py', 'script2.py', 'script3.py', 'script4.py']
+excel_files = ['file1.xlsx', 'file2.xlsx', 'file3.xlsx', 'file4.xlsx']
+
+# Execute the Python scripts
+for script in scripts:
+    os.system(f'python {script}')
+
+# Create an email message
+msg = MIMEMultipart()
+msg['From'] = 'your_email@example.com'
+msg['To'] = 'recipient@example.com'
+msg['Subject'] = 'Generated Excel Sheets'
+
+# Attach the Excel files
+for file in excel_files:
+    part = MIMEBase('application', 'octet-stream')
+    part.set_payload(open(file, 'rb').read())
+    encoders.encode_base64(part)
+    part.add_header('Content-Disposition', f'attachment; filename="{file}"')
+    msg.attach(part)
+
+# Connect to the local SMTP server (assumes no authentication required)
+server = smtplib.SMTP('localhost')
+
+# Send the email
+server.sendmail(msg['From'], msg['To'], msg.as_string())
+
+# Close the connection
+server.quit()
