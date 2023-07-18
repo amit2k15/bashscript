@@ -1,39 +1,45 @@
-#!/bin/bash
+#!/usr/bin/expect
 
 # Check if all required arguments are provided
-if [ $# -ne 4 ]; then
-  echo "Usage: $0 <sftp_host> <sftp_port> <sftp_user> <sftp_password>"
-  exit 1
-fi
-
-# Assign arguments to variables
-sftp_host=$1
-sftp_port=$2
-sftp_user=$3
-sftp_password=$4
-
-# Define the SFTP command
-sftp_cmd="sshpass -p '$sftp_password' sftp -oPort=$sftp_port $sftp_user@$sftp_host"
-
-# Function to monitor authentication
-monitor_authentication() {
-  while true; do
-    # Execute the SFTP command and capture the output
-    result=$(eval "$sftp_cmd" 2>&1)
-
-    # Check if authentication was successful or failed
-    if echo "$result" | grep -q "Authentication succeeded"; then
-      echo "Authentication successful!"
-      break
-    elif echo "$result" | grep -q "Permission denied"; then
-      echo "Authentication failed!"
-      break
-    fi
-
-    # Wait for a few seconds before trying again
-    sleep 5
-  done
+if {$argc != 4} {
+    puts "Usage: $argv0 <host> <port> <user> <password>"
+    exit 1
 }
 
-# Call the function to monitor authentication
-monitor_authentication
+# Assign command-line arguments to variables
+set host [lindex $argv 0]
+set port [lindex $argv 1]
+set user [lindex $argv 2]
+set password [lindex $argv 3]
+
+# Command to check SFTP authentication
+set sftp_command "sftp -P $port $user@$host"
+
+# Spawn the sftp command
+spawn $sftp_command
+
+# Look for specific patterns to handle different scenarios
+expect {
+    # If prompted for a password, send the password
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    # If the connection is successful, print a success message
+    "sftp>" {
+        puts "SFTP authentication successful!"
+    }
+    # If authentication fails, print an error message
+    "Permission denied, please try again." {
+        puts "Authentication failed. Please check your credentials."
+        exit 1
+    }
+    # If some other unexpected output occurs, print an error message
+    default {
+        puts "Error: Unexpected output. Please check your inputs and try again."
+        exit 1
+    }
+}
+
+# Wait for the command to finish
+expect eof
