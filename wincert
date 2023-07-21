@@ -1,0 +1,24 @@
+param (
+    [string]$CertificateName,
+    [string]$CertificatePath
+)
+
+# Get the certificate from the specified path and name
+$cert = Get-ChildItem -Path $CertificatePath | Where-Object { $_.Name -eq $CertificateName }
+
+if ($cert -eq $null) {
+    Write-Host "Certificate not found: $CertificatePath\$CertificateName"
+    exit 1
+}
+
+# Get the expiry date of the certificate
+$expiryDate = $cert.NotAfter
+
+# Calculate the number of days left until expiration
+$daysUntilExpiration = (Get-Date $expiryDate).Date.Subtract((Get-Date).Date).Days
+
+# Output the results
+Write-Host "Certificate Name: $CertificateName"
+Write-Host "Certificate Path: $CertificatePath"
+Write-Host "Expiry Date: $expiryDate"
+Write-Host "Days Until Expiration: $daysUntilExpiration days"
