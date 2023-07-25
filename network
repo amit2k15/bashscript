@@ -1,0 +1,9 @@
+Hi Team,
+writing to request your assistance in investigating an issue we have been observing in our Zabbix monitoring tool related to database query monitoring. We suspect there might be a network-related problem causing the gaps in monitoring data, and we would appreciate your expertise in investigating this matter further.
+We have been closely monitoring the DB queries using zabbix monitoring tool. From last few weeks we've noticed intermittent gaps in the monitoring data related to DB queries the issue appears to be occurring predominantly on weekends and is specific to our DB monitoring.These gaps typically last between 20 to 30 minutes, but we have also noticed a more extended occurrence that lasted for about 5 hours on 14th July 09:38 PM to 15th July 02:48 AM .
+As per our conversation with the DB team, they have confirmed that there were no issues on the database side during the periods when the monitoring gaps occurred. Furthermore, they informed us that they encountered a similar problem in the Grafana tool during the same time frame.
+Monitoring Proxy :
+
+We are looking forward to your findings and recommendations on how we can prevent or mitigate these disruptions in the future.
+
+Thank you for your attention and support.
