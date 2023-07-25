@@ -1,74 +1,80 @@
 import requests
+import json
 import mysql.connector
 
-# Replace these variables with your Venafi API URL and access token
-VENAFI_API_URL = 'YOUR_VENAFI_API_URL'
-VENAFI_ACCESS_TOKEN = 'YOUR_VENAFI_ACCESS_TOKEN'
+# Replace these variables with your Venafi API endpoint and MySQL database details
+VENAFI_API_URL = "YOUR_VENAFI_API_URL"
+MYSQL_HOST = "YOUR_MYSQL_HOST"
+MYSQL_USER = "YOUR_MYSQL_USER"
+MYSQL_PASSWORD = "YOUR_MYSQL_PASSWORD"
+MYSQL_DATABASE = "YOUR_MYSQL_DATABASE"
 
-# Replace these variables with your MySQL database credentials
-MYSQL_HOST = 'YOUR_MYSQL_HOST'
-MYSQL_USER = 'YOUR_MYSQL_USER'
-MYSQL_PASSWORD = 'YOUR_MYSQL_PASSWORD'
-MYSQL_DATABASE = 'YOUR_MYSQL_DATABASE'
-
-def get_data_from_venafi_api():
-    headers = {
-        'Authorization': f'Bearer {VENAFI_ACCESS_TOKEN}'
-    }
-    response = requests.get(VENAFI_API_URL, headers=headers)
+def fetch_data_from_venafi_api():
+    response = requests.get(VENAFI_API_URL)
     if response.status_code == 200:
         return response.json()
     else:
-        print(f"Failed to fetch data from Venafi API. Status code: {response.status_code}")
-        return None
+        raise Exception("Failed to fetch data from Venafi API")
 
-def insert_data_to_mysql(data):
-    if 'Certificates' not in data:
-        print("No certificate data found in the response.")
-        return
+def extract_required_fields(data):
+    certificates = data.get("Certificates", [])
+    extracted_data = []
+    for cert in certificates:
+        extracted_data.append({
+            "CreatedOn": cert["CreatedOn"],
+            "DN": cert["DN"],
+            "Guid": cert["Guid"],
+            "Name": cert["Name"],
+            "ParentDn": cert["ParentDn"],
+            "DNS": cert["X509"]["SANS"]["DNS"][0],
+            "Serial": cert["X509"]["Serial"],
+            "ValidFrom": cert["X509"]["ValidFrom"],
+            "ValidTo": cert["X509"]["ValidTo"]
+        })
+    return extracted_data
 
-    certificates = data['Certificates']
-    if not certificates:
-        print("No certificates found in the response.")
-        return
+def insert_data_into_mysql(data):
+    connection = mysql.connector.connect(
+        host=MYSQL_HOST,
+        user=MYSQL_USER,
+        password=MYSQL_PASSWORD,
+        database=MYSQL_DATABASE
+    )
 
-    try:
-        conn = mysql.connector.connect(
-            host=MYSQL_HOST,
-            user=MYSQL_USER,
-            password=MYSQL_PASSWORD,
-            database=MYSQL_DATABASE
-        )
-        cursor = conn.cursor()
+    cursor = connection.cursor()
 
-        for certificate in certificates:
-            created_on = certificate.get('CreatedOn')
-            dn = certificate.get('DN')
-            guid = certificate.get('Guid')
-            name = certificate.get('Name')
-            parent_dn = certificate.get('ParentDn')
-            dns = certificate.get('X509', {}).get('SANS', {}).get('DNS', [])[0]
-            serial = certificate.get('X509', {}).get('Serial')
-            valid_from = certificate.get('X509', {}).get('ValidFrom')
-            valid_to = certificate.get('X509', {}).get('ValidTo')
+    # Create the table if it doesn't exist
+    create_table_query = (
+        "CREATE TABLE IF NOT EXISTS certificates ("
+        "id INT AUTO_INCREMENT PRIMARY KEY,"
+        "CreatedOn DATETIME,"
+        "DN VARCHAR(255),"
+        "Guid VARCHAR(255),"
+        "Name VARCHAR(255),"
+        "ParentDn VARCHAR(255),"
+        "DNS VARCHAR(255),"
+        "Serial VARCHAR(255),"
+        "ValidFrom DATETIME,"
+        "ValidTo DATETIME)"
+    )
+    cursor.execute(create_table_query)
 
-            query = "INSERT INTO certificates (CreatedOn, DN, Guid, Name, ParentDn, DNS, Serial, ValidFrom, ValidTo) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-            values = (created_on, dn, guid, name, parent_dn, dns, serial, valid_from, valid_to)
-            cursor.execute(query, values)
+    # Insert data into the table
+    insert_query = (
+        "INSERT INTO certificates (CreatedOn, DN, Guid, Name, ParentDn, DNS, Serial, ValidFrom, ValidTo) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    )
+    data_to_insert = extract_required_fields(data)
+    cursor.executemany(insert_query, [tuple(cert.values()) for cert in data_to_insert])
 
-        conn.commit()
-        print("Data inserted successfully into the MySQL database.")
-
-    except mysql.connector.Error as error:
-        print(f"Error while inserting data to MySQL: {error}")
-
-    finally:
-        if cursor:
-            cursor.close()
-        if conn and conn.is_connected():
-            conn.close()
+    connection.commit()
+    cursor.close()
+    connection.close()
 
 if __name__ == "__main__":
-    venafi_data = get_data_from_venafi_api()
-    if venafi_data:
-        insert_data_to_mysql(venafi_data)
+    try:
+        venafi_data = fetch_data_from_venafi_api()
+        insert_data_into_mysql(venafi_data)
+        print("Data inserted into MySQL successfully.")
+    except Exception as e:
+        print("Error:", e)
