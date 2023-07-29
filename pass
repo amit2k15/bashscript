@@ -1,0 +1,25 @@
+Dear Shreyas,
+
+I hope this email finds you well. I am writing to inform you about a critical issue we encountered yesterday that caused an outage in our TMS and PCS application/service monitoring using Zabbix.
+
+Yesterday, around 8:48 AM CST, we noticed that the access to the monitoring services was denied, leading us to investigate the root cause of the problem. Upon analyzing the situation, we discovered that the cause of the outage was related to a password issue.
+
+We utilize two non-user accounts for monitoring these services, and it appears that the passwords for these accounts were automatically changed. Our team was able to identify this change when checking the passwords in the "cyberarc" tool for the respective accounts.
+
+For your reference, the password expiry details for those two accounts in "cyberarc" are as follows:
+
+Account 1:
+
+Username: [Account 1 Username]
+Password Expiry: [Date and Time]
+Account 2:
+
+Username: [Account 2 Username]
+Password Expiry: [Date and Time]
+Unfortunately, I do not have the privilege to reset or change the passwords from my end, which is why I am reaching out to you for assistance. We urgently need your expertise to help us understand and identify the root cause behind this password change.
+
+Could you kindly investigate this matter and let us know your findings as soon as possible? It is crucial for us to ensure the security and stability of our monitoring systems, and your assistance in resolving this issue is highly appreciated.
+
+If you require any further information or access to specific resources for your investigation, please feel free to let me know, and I will be more than willing to provide the necessary support.
+
+Thank you for your prompt attention to this matter. We look forward to your assistance in resolving this issue and preventing any such incidents in the future.
