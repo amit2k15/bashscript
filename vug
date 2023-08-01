@@ -1,0 +1,28 @@
+param (
+    [Parameter(Mandatory=$true)]
+    [string]$VugenScriptName
+)
+
+# Assuming VUGen executable path, update it if necessary
+$VugenExePath = "C:\Path\To\VUGen.exe"
+
+# Assuming VUGen script directory, update it if necessary
+$VugenScriptDir = "C:\Path\To\Scripts"
+
+# Assuming VUGen log file directory, update it if necessary
+$LogFilePath = "C:\Path\To\LogFiles"
+
+# Change the current directory to the VUGen script directory
+Set-Location $VugenScriptDir
+
+# Execute the VUGen script with appropriate command-line arguments
+$commandLineArgs = "your_vugen_script_command_line_args_here", "--output", "$LogFilePath\$VugenScriptName.log"
+Start-Process -FilePath $VugenExePath -ArgumentList $commandLineArgs -Wait
+
+# Check if the log file exists and display its content
+$logFile = Join-Path $LogFilePath "$VugenScriptName.log"
+if (Test-Path $logFile) {
+    Get-Content $logFile
+} else {
+    Write-Host "Log file not found: $logFile"
+}
