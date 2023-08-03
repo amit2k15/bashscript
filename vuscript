@@ -1,0 +1,36 @@
+Action()
+{
+    // Define variables
+    char *url = "https://www.google.com";
+    int responseCode;
+    double startTime, endTime, responseTime;
+
+    // Start the transaction
+    lr_start_transaction("NavigateToGoogle");
+
+    // Measure response time for navigating to Google homepage
+    startTime = lr_get_transaction_time("NavigateToGoogle");
+    web_custom_request("NavigateToGooglePage",
+        "URL={url}",
+        "Method=GET",
+        LAST
+    );
+    endTime = lr_get_transaction_time("NavigateToGoogle");
+    responseTime = endTime - startTime;
+
+    // Check the response code to ensure successful navigation
+    responseCode = web_get_int_property(HTTP_INFO_RETURN_CODE);
+    if (responseCode == 200)
+    {
+        lr_output_message("Navigation to Google homepage was successful. Response time: %f seconds", responseTime);
+    }
+    else
+    {
+        lr_error_message("Failed to navigate to Google homepage. HTTP response code: %d", responseCode);
+    }
+
+    // End the transaction
+    lr_end_transaction("NavigateToGoogle", LR_AUTO);
+
+    return 0;
+}
