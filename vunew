@@ -1,0 +1,20 @@
+# Set the path to LoadRunner's bin directory
+$loadRunnerBinPath = "C:\Program Files (x86)\Micro Focus\LoadRunner\bin"
+
+# Set the path to your Vugen script (.usr)
+$scriptPath = "C:\path\to\your\script.usr"
+
+# Set the output file path for the LoadRunner log
+$logFilePath = "C:\path\to\your\output.log"
+
+# Change directory to LoadRunner's bin directory
+Set-Location $loadRunnerBinPath
+
+# Run the Vugen script using mdrv.exe (Controller)
+Start-Process -FilePath ".\mdrv.exe" -ArgumentList "-usr $scriptPath -l $logFilePath"
+
+# Wait for the process to finish (adjust the timeout value if needed)
+Wait-Process -Name mdrv -Timeout 600
+
+# Display the LoadRunner log content
+Get-Content $logFilePath
