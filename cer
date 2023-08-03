@@ -1,0 +1,13 @@
+We are writing to inform you about an important initiative we are undertaking to enhance the security and reliability of our applications. As part of our efforts, we are planning to implement a robust certificate monitoring system using Venafi, a leading certificate management platform.
+
+The purpose of this email is to request your cooperation in the process of monitoring the certificates associated with your respective applications in Venafi. To effectively monitor these certificates and prevent any potential issues caused by certificate expirations, we require access to certificate data, which is managed through the "venafi_read" group.
+
+We have already initiated the process by raising a secure request for your "venafi_read" group access. Before we can proceed with certificate monitoring, we kindly request you to review and approve this request. Your approval will grant us the necessary access to the certificate data, allowing us to effectively monitor the certificate lifecycles and proactively address any potential expiry issues.
+
+Thank you for your prompt attention to this matter. Your collaboration is crucial to the success of this initiative, and we look forward to your support in ensuring the continuous security and availability of our applications.
+
+
+
+
+
+
