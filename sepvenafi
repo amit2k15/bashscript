@@ -1,0 +1,60 @@
+import requests
+import mysql.connector
+
+# Replace with your Venafi API endpoint and authentication
+venafi_api_url = "https://your-venafi-api-endpoint.com/api/certificates"
+headers = {
+    "Authorization": "Bearer your-access-token"
+}
+
+# Replace with your MySQL database connection details
+mysql_config = {
+    "host": "your-mysql-host",
+    "user": "your-mysql-user",
+    "password": "your-mysql-password",
+    "database": "your-mysql-database"
+}
+
+def fetch_data_from_api():
+    response = requests.get(venafi_api_url, headers=headers)
+    return response.json()
+
+def extract_and_insert_data(data):
+    certificates = data.get("Certificates", [])
+    valid_certificates = []
+
+    for cert in certificates:
+        if "X509" in cert:
+            valid_certificates.append(cert)
+
+    connection = mysql.connector.connect(**mysql_config)
+    cursor = connection.cursor()
+
+    for cert in valid_certificates:
+        created_on = cert["CreatedOn"]
+        dn = cert["DN"]
+        guid = cert["Guid"]
+        name = cert["Name"]
+        parent_dn = cert["ParentDn"]
+        x509 = cert["X509"]
+        dns = ", ".join(x509["SANS"]["DNS"]) if x509.get("SANS") and x509["SANS"].get("DNS") else ""
+        serial = x509.get("Serial")
+        valid_from = x509.get("ValidFrom")
+        valid_to = x509.get("ValidTo")
+
+        insert_query = "INSERT INTO certificates (CreatedOn, DN, Guid, Name, ParentDn, DNS, Serial, ValidFrom, ValidTo) " \
+                       "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        insert_data = (created_on, dn, guid, name, parent_dn, dns, serial, valid_from, valid_to)
+
+        cursor.execute(insert_query, insert_data)
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+def main():
+    api_data = fetch_data_from_api()
+    extract_and_insert_data(api_data)
+
+if __name__ == "__main__":
+    main()
