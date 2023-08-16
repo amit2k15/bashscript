@@ -1,0 +1,53 @@
+import requests
+import mysql.connector
+
+# Venafi API endpoint and headers
+venafi_url = "YOUR_VENAFI_API_URL"
+headers = {
+    "Authorization": "Bearer YOUR_ACCESS_TOKEN",
+    "Content-Type": "application/json"
+}
+
+# MySQL database configuration
+mysql_config = {
+    "host": "localhost",
+    "user": "username",
+    "password": "password",
+    "database": "venafi_data"
+}
+
+def insert_into_database(certificates):
+    connection = mysql.connector.connect(**mysql_config)
+    cursor = connection.cursor()
+
+    for certificate in certificates:
+        x509_info = certificate.get("X509")
+        if x509_info:
+            created_on = certificate.get("CreatedOn")
+            dn = certificate.get("DN")
+            guid = certificate.get("Guid")
+            name = certificate.get("Name")
+            parent_dn = certificate.get("ParentDn")
+            dns = x509_info["SANS"]["DNS"][0]
+            serial = x509_info.get("Serial")
+            valid_from = x509_info.get("ValidFrom")
+            valid_to = x509_info.get("ValidTo")
+
+            query = "INSERT INTO certificates (CreatedOn, DN, Guid, Name, ParentDN, DNS, Serial, ValidFrom, ValidTo) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            values = (created_on, dn, guid, name, parent_dn, dns, serial, valid_from, valid_to)
+            
+            cursor.execute(query, values)
+            connection.commit()
+
+    cursor.close()
+    connection.close()
+
+def main():
+    response = requests.get(venafi_url, headers=headers)
+    data = response.json()
+
+    certificates = data.get("Certificates", [])
+    insert_into_database(certificates)
+
+if __name__ == "__main__":
+    main()
