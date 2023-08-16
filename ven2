@@ -1,0 +1,83 @@
+import requests
+import json
+import mysql.connector
+
+# Replace with your Venafi API credentials and endpoint URL
+venafi_api_url = "YOUR_VENAFI_API_URL"
+venafi_headers = {
+    "Authorization": "Bearer YOUR_ACCESS_TOKEN",
+    "Content-Type": "application/json"
+}
+
+# Replace with your MySQL database credentials
+db_config = {
+    "host": "localhost",
+    "user": "your_username",
+    "password": "your_password",
+    "database": "your_database"
+}
+
+# Venafi API request
+response = requests.get(venafi_api_url, headers=venafi_headers)
+data = response.json()
+
+# Filter certificates with X509 data and selected fields
+filtered_certificates = []
+for certificate in data["Certificates"]:
+    if "X509" in certificate:
+        filtered_certificate = {
+            "CreatedOn": certificate["CreatedOn"],
+            "DN": certificate["DN"],
+            "Guid": certificate["Guid"],
+            "Name": certificate["Name"],
+            "ParentDn": certificate["ParentDn"],
+            "Serial": certificate["X509"]["Serial"],
+            "ValidFrom": certificate["X509"]["ValidFrom"],
+            "ValidTo": certificate["X509"]["ValidTo"]
+        }
+        filtered_certificates.append(filtered_certificate)
+
+# Connect to MySQL database
+db_connection = mysql.connector.connect(**db_config)
+db_cursor = db_connection.cursor()
+
+# Drop and recreate the table
+db_cursor.execute("DROP TABLE IF EXISTS certificates")
+db_cursor.execute("""
+    CREATE TABLE certificates (
+        CreatedOn DATETIME,
+        DN VARCHAR(255),
+        Guid VARCHAR(255),
+        Name VARCHAR(255),
+        ParentDn VARCHAR(255),
+        Serial VARCHAR(255),
+        ValidFrom DATETIME,
+        ValidTo DATETIME
+    )
+""")
+
+# Insert data into MySQL database
+insert_query = """
+    INSERT INTO certificates
+    (CreatedOn, DN, Guid, Name, ParentDn, Serial, ValidFrom, ValidTo)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+"""
+
+for certificate in filtered_certificates:
+    db_cursor.execute(insert_query, (
+        certificate["CreatedOn"],
+        certificate["DN"],
+        certificate["Guid"],
+        certificate["Name"],
+        certificate["ParentDn"],
+        certificate["Serial"],
+        certificate["ValidFrom"],
+        certificate["ValidTo"]
+    ))
+
+# Commit changes and close connection
+db_connection.commit()
+db_cursor.close()
+db_connection.close()
+
+print("Data insertion into MySQL database completed.")
