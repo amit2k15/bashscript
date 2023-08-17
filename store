@@ -1,0 +1,22 @@
+-- Create a stored procedure
+DELIMITER //
+
+CREATE PROCEDURE InsertAndRetrieveData()
+BEGIN
+    -- Create a temporary table and insert data from another table
+    CREATE TEMPORARY TABLE temp_table AS
+    SELECT * FROM source_table;
+
+    -- Retrieve data from the temporary table
+    SELECT * FROM temp_table;
+
+    -- Drop the temporary table
+    DROP TEMPORARY TABLE IF EXISTS temp_table;
+END;
+
+//
+
+DELIMITER ;
+
+-- Call the stored procedure to perform the operations
+CALL InsertAndRetrieveData();
