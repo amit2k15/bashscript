@@ -1,0 +1,93 @@
+import requests
+import openpyxl
+
+# Zabbix API details
+zabbix_url = "http://your_zabbix_server/api_jsonrpc.php"
+zabbix_user = "your_username"
+zabbix_password = "your_password"
+
+# Authenticate and get Zabbix API token
+payload = {
+    "jsonrpc": "2.0",
+    "method": "user.login",
+    "params": {
+        "user": zabbix_user,
+        "password": zabbix_password
+    },
+    "id": 1
+}
+
+response = requests.post(zabbix_url, json=payload)
+auth_result = response.json()
+
+if 'result' in auth_result:
+    auth_token = auth_result['result']
+else:
+    print("Authentication failed.")
+    exit()
+
+# Fetch disabled hosts
+host_payload = {
+    "jsonrpc": "2.0",
+    "method": "host.get",
+    "params": {
+        "output": ["hostid", "host"],
+        "filter": {"status": 1},  # Status 1 represents disabled hosts
+        "selectGroups": ["groupid", "name"],
+        "selectInterfaces": ["ip"]
+    },
+    "auth": auth_token,
+    "id": 2
+}
+
+response = requests.post(zabbix_url, json=host_payload)
+host_result = response.json()
+
+# Fetch host groups
+group_payload = {
+    "jsonrpc": "2.0",
+    "method": "hostgroup.get",
+    "params": {
+        "output": ["groupid", "name"]
+    },
+    "auth": auth_token,
+    "id": 3
+}
+
+response = requests.post(zabbix_url, json=group_payload)
+group_result = response.json()
+
+# Creating Excel file
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "Disabled Hosts"
+
+# Adding headers
+ws.append(["Host ID", "Host Name", "IP Address", "Group ID", "Group Name"])
+
+# Writing data to Excel
+for host in host_result['result']:
+    host_id = host['hostid']
+    host_name = host['host']
+    ip_address = host['interfaces'][0]['ip']
+    group_id = host['groups'][0]['groupid']
+    group_name = host['groups'][0]['name']
+    ws.append([host_id, host_name, ip_address, group_id, group_name])
+
+# Saving the Excel file
+excel_file_path = "disabled_hosts.xlsx"
+wb.save(excel_file_path)
+print(f"Data saved to {excel_file_path}")
+
+# Logout
+logout_payload = {
+    "jsonrpc": "2.0",
+    "method": "user.logout",
+    "params": [],
+    "id": 4,
+    "auth": auth_token
+}
+
+requests.post(zabbix_url, json=logout_payload)
+
+print("Logged out.")
