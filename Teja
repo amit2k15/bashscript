@@ -1,0 +1,4 @@
+Hi Teja,
+I wanted to bring to your attention a critical security concern that has come to my notice regarding the Enterprise Zabbix Agent running on all machines on port 10052 (Custom Port).
+It appears that this agent is running with "Remote command Execution" without obtaining any confirmation or consent from our teams. This situation raises the potential risk of unauthorized access and the capturing of vital information without proper consent.
+I tried to stop the agent on our Stage Zabbix application server. However, I encountered a challenge in this process. Every 5 minutes, the agent automatically restarts.
