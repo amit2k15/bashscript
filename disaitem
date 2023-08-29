@@ -1,17 +1,14 @@
 import requests
+import json
 import openpyxl
 
-# Zabbix API configuration
-ZABBIX_URL = "https://your-zabbix-instance/api_jsonrpc.php"
-ZABBIX_USERNAME = "your-username"
-ZABBIX_PASSWORD = "your-password"
+# Zabbix API Configuration
+ZABBIX_URL = 'https://your-zabbix-instance/api_jsonrpc.php'
+ZABBIX_USERNAME = 'your-username'
+ZABBIX_PASSWORD = 'your-password'
 
-# Excel file configuration
-EXCEL_FILE = "disabled_items_report.xlsx"
-
-def get_disabled_items():
-    # Authenticate to Zabbix API
-    payload = {
+def authenticate_zabbix():
+    auth_payload = {
         "jsonrpc": "2.0",
         "method": "user.login",
         "params": {
@@ -19,48 +16,46 @@ def get_disabled_items():
             "password": ZABBIX_PASSWORD
         },
         "id": 1,
+        "auth": None
     }
-    response = requests.post(ZABBIX_URL, json=payload, verify=False)
-    auth_result = response.json()
 
-    if "result" in auth_result:
-        auth_token = auth_result["result"]
-        
-        # Get disabled items
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "item.get",
-            "params": {
-                "output": ["itemid", "name", "hostid", "status"],
-                "filter": {"status": 1},  # Disabled items
-                "selectHosts": ["host"],
-                "selectGroups": ["groupid", "name"]
-            },
-            "auth": auth_token,
-            "id": 2,
-        }
-        response = requests.post(ZABBIX_URL, json=payload, verify=False)
-        items_result = response.json()
+    response = requests.post(ZABBIX_URL, json=auth_payload)
+    return response.json()['result']
 
-        if "result" in items_result:
-            return items_result["result"]
+def get_disabled_items(auth_token):
+    item_payload = {
+        "jsonrpc": "2.0",
+        "method": "item.get",
+        "params": {
+            "output": ["itemid", "name", "status"],
+            "monitored": False,  # Only disabled items
+            "selectHosts": ["name", "host"],
+            "selectGroups": ["name"]
+        },
+        "auth": auth_token,
+        "id": 2
+    }
 
-    return []
+    response = requests.post(ZABBIX_URL, json=item_payload)
+    return response.json()['result']
 
-def create_excel_report(items):
-    workbook = openpyxl.Workbook()
-    worksheet = workbook.active
-    worksheet.append(["Host Group", "Host", "Item Name"])
+def export_to_excel(data):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(['Host', 'Host Group', 'Item Name'])
 
-    for item in items:
-        host_group = item["groups"][0]["name"]
-        host = item["hosts"][0]["host"]
-        item_name = item["name"]
-        worksheet.append([host_group, host, item_name])
+    for item in data:
+        host_name = item['hosts'][0]['name']
+        group_name = item['groups'][0]['name']
+        item_name = item['name']
+        ws.append([host_name, group_name, item_name])
 
-    workbook.save(EXCEL_FILE)
-    print(f"Excel report saved as {EXCEL_FILE}")
+    wb.save('disabled_items_report.xlsx')
 
-if __name__ == "__main__":
-    disabled_items = get_disabled_items()
-    create_excel_report(disabled_items)
+def main():
+    auth_token = authenticate_zabbix()
+    disabled_items = get_disabled_items(auth_token)
+    export_to_excel(disabled_items)
+
+if __name__ == '__main__':
+    main()
