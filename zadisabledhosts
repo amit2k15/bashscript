@@ -1,70 +1,81 @@
 import requests
-import json
 import openpyxl
 
-# Zabbix API details
-zabbix_url = 'https://your-zabbix-server/api_jsonrpc.php'
+# Zabbix API configuration
+zabbix_url = 'https://your-zabbix-url/api_jsonrpc.php'
 zabbix_user = 'your-username'
 zabbix_password = 'your-password'
 
-# Authenticate and get the Zabbix API token
-headers = {'Content-Type': 'application/json-rpc'}
-data = {
+# API request headers
+headers = {'Content-Type': 'application/json'}
+
+# Zabbix API authentication
+auth_payload = {
     'jsonrpc': '2.0',
     'method': 'user.login',
     'params': {
         'user': zabbix_user,
-        'password': zabbix_password,
+        'password': zabbix_password
     },
-    'id': 1,
+    'id': 1
 }
-response = requests.post(zabbix_url, data=json.dumps(data), headers=headers)
-result = response.json()
 
-if 'result' in result:
-    auth_token = result['result']
+response = requests.post(zabbix_url, json=auth_payload, headers=headers)
+auth_result = response.json()
+
+if 'result' in auth_result:
+    auth_token = auth_result['result']
+    print("Successfully authenticated.")
 else:
-    print("Login failed. Check your credentials.")
+    print("Authentication failed.")
     exit()
 
-# Get disabled items
-data = {
+# Fetch disabled items
+item_payload = {
     'jsonrpc': '2.0',
     'method': 'item.get',
     'params': {
-        'output': ['hostid', 'name', 'status'],
-        'filter': {'status': 1},  # 1 indicates disabled items
+        'output': ['name', 'status'],
         'selectHosts': ['host'],
+        'filter': {'status': 1}  # 0 for enabled, 1 for disabled
     },
     'auth': auth_token,
-    'id': 2,
+    'id': 2
 }
-response = requests.post(zabbix_url, data=json.dumps(data), headers=headers)
-result = response.json()
 
-if 'result' in result:
-    disabled_items = result['result']
-else:
-    print("Failed to fetch disabled items.")
-    exit()
+response = requests.post(zabbix_url, json=item_payload, headers=headers)
+item_data = response.json()
 
-# Create an Excel workbook and worksheet
+# Create Excel workbook and sheet
 workbook = openpyxl.Workbook()
-worksheet = workbook.active
-worksheet.title = "Disabled Items"
+sheet = workbook.active
+sheet.title = 'Disabled Items Report'
 
-# Write headers
-headers = ['Host', 'Host Group', 'Item Name']
-worksheet.append(headers)
+# Add header row
+sheet.append(['Item Name', 'Status', 'Host', 'Host Group'])
 
-# Get host and host group information for each disabled item
-for item in disabled_items:
-    host = item['hosts'][0]['host']
-    host_group = item['hosts'][0]['groups'][0]['name']
+# Iterate through item data and fetch host and host group
+for item in item_data['result']:
     item_name = item['name']
-    worksheet.append([host, host_group, item_name])
+    item_status = 'Disabled'
+    host_name = item['hosts'][0]['host']
+    host_group = item['hosts'][0]['groups'][0]['name']
 
-# Save the workbook
-report_filename = 'disabled_items_report.xlsx'
-workbook.save(report_filename)
-print(f"Report saved as {report_filename}")
+    sheet.append([item_name, item_status, host_name, host_group])
+
+# Save the Excel file
+excel_filename = 'disabled_items_report.xlsx'
+workbook.save(excel_filename)
+print(f"Excel report saved as '{excel_filename}'.")
+
+# Logout
+logout_payload = {
+    'jsonrpc': '2.0',
+    'method': 'user.logout',
+    'params': [],
+    'id': 3,
+    'auth': auth_token
+}
+
+requests.post(zabbix_url, json=logout_payload, headers=headers)
+print("Logged out from Zabbix.")
