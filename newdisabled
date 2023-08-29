@@ -1,0 +1,64 @@
+import requests
+import json
+import openpyxl
+
+# Zabbix API details
+zabbix_url = "https://your_zabbix_instance/api_jsonrpc.php"
+zabbix_user = "your_username"
+zabbix_password = "your_password"
+
+# Login to Zabbix API
+def zabbix_login():
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "user.login",
+        "params": {
+            "user": zabbix_user,
+            "password": zabbix_password
+        },
+        "id": 1
+    }
+
+    response = requests.post(zabbix_url, json=payload)
+    return response.json()["result"]
+
+# Get disabled items for hosts and host groups
+def get_disabled_items(token):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "item.get",
+        "params": {
+            "output": ["name", "status"],
+            "filter": {"status": 1},  # 0 - enabled, 1 - disabled
+            "selectHosts": ["host"],
+            "selectGroups": ["name"],
+            "sortfield": "name"
+        },
+        "auth": token,
+        "id": 2
+    }
+
+    response = requests.post(zabbix_url, json=payload)
+    return response.json()["result"]
+
+# Export data to Excel
+def export_to_excel(data):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Disabled Items Report"
+    ws.append(["Item Name", "Status", "Host", "Host Group"])
+
+    for item in data:
+        ws.append([item["name"], "Disabled", item["hosts"][0]["host"], item["groups"][0]["name"]])
+
+    excel_file = "disabled_items_report.xlsx"
+    wb.save(excel_file)
+    print(f"Data exported to {excel_file}")
+
+if __name__ == "__main__":
+    try:
+        auth_token = zabbix_login()
+        disabled_items = get_disabled_items(auth_token)
+        export_to_excel(disabled_items)
+    except Exception as e:
+        print(f"An error occurred: {e}")
