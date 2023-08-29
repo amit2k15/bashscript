@@ -1,0 +1,107 @@
+import requests
+import json
+import openpyxl
+
+# Zabbix API configuration
+ZABBIX_API_URL = "https://your_zabbix_instance/api_jsonrpc.php"
+ZABBIX_USERNAME = "your_username"
+ZABBIX_PASSWORD = "your_password"
+
+# Authenticate and get Zabbix API token
+def authenticate():
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "jsonrpc": "2.0",
+        "method": "user.login",
+        "params": {
+            "user": ZABBIX_USERNAME,
+            "password": ZABBIX_PASSWORD,
+        },
+        "id": 1,
+    }
+
+    response = requests.post(ZABBIX_API_URL, data=json.dumps(data), headers=headers)
+    result = response.json()
+    return result["result"]
+
+# Get disabled items
+def get_disabled_items(token):
+    headers = {
+        "Content-Type": "application/json-rpc",
+        "Authorization": f"Bearer {token}",
+    }
+    data = {
+        "jsonrpc": "2.0",
+        "method": "item.get",
+        "params": {
+            "output": ["hostid", "name"],
+            "filter": {"status": 1},  # 1 indicates disabled items
+        },
+        "id": 2,
+    }
+
+    response = requests.post(ZABBIX_API_URL, data=json.dumps(data), headers=headers)
+    result = response.json()
+    return result["result"]
+
+# Get host details for a given host ID
+def get_host_details(token, host_id):
+    headers = {
+        "Content-Type": "application/json-rpc",
+        "Authorization": f"Bearer {token}",
+    }
+    data = {
+        "jsonrpc": "2.0",
+        "method": "host.get",
+        "params": {
+            "output": ["name", "host"],
+            "hostids": [host_id],
+        },
+        "id": 3,
+    }
+
+    response = requests.post(ZABBIX_API_URL, data=json.dumps(data), headers=headers)
+    result = response.json()
+    return result["result"][0]
+
+# Get host group details for a given host group ID
+def get_host_group_details(token, group_id):
+    headers = {
+        "Content-Type": "application/json-rpc",
+        "Authorization": f"Bearer {token}",
+    }
+    data = {
+        "jsonrpc": "2.0",
+        "method": "hostgroup.get",
+        "params": {
+            "output": ["name"],
+            "groupids": [group_id],
+        },
+        "id": 4,
+    }
+
+    response = requests.post(ZABBIX_API_URL, data=json.dumps(data), headers=headers)
+    result = response.json()
+    return result["result"][0]
+
+# Main function
+def main():
+    token = authenticate()
+
+    disabled_items = get_disabled_items(token)
+
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Disabled Items Report"
+    worksheet.append(["Host", "Host Group", "Item Name"])
+
+    for item in disabled_items:
+        host_details = get_host_details(token, item["hostid"])
+        host_group_details = get_host_group_details(token, host_details["groups"][0]["groupid"])
+        worksheet.append([host_details["host"], host_group_details["name"], item["name"]])
+
+    workbook.save("disabled_items_report.xlsx")
+    print("Report saved as disabled_items_report.xlsx")
+
+if __name__ == "__main__":
+    main()
