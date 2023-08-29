@@ -1,81 +1,56 @@
 import requests
-import openpyxl
+import json
+from openpyxl import Workbook
 
-# Zabbix API configuration
-zabbix_url = 'https://your-zabbix-url/api_jsonrpc.php'
-zabbix_user = 'your-username'
-zabbix_password = 'your-password'
+# Zabbix API credentials
+ZABBIX_URL = 'https://your_zabbix_instance/api_jsonrpc.php'
+ZABBIX_USER = 'your_username'
+ZABBIX_PASSWORD = 'your_password'
 
-# API request headers
-headers = {'Content-Type': 'application/json'}
+# Zabbix API headers
+headers = {'Content-Type': 'application/json-rpc'}
 
 # Zabbix API authentication
 auth_payload = {
     'jsonrpc': '2.0',
     'method': 'user.login',
     'params': {
-        'user': zabbix_user,
-        'password': zabbix_password
+        'user': ZABBIX_USER,
+        'password': ZABBIX_PASSWORD,
     },
-    'id': 1
+    'id': 1,
 }
 
-response = requests.post(zabbix_url, json=auth_payload, headers=headers)
+response = requests.post(ZABBIX_URL, data=json.dumps(auth_payload), headers=headers, verify=False)
 auth_result = response.json()
-
-if 'result' in auth_result:
-    auth_token = auth_result['result']
-    print("Successfully authenticated.")
-else:
-    print("Authentication failed.")
-    exit()
+auth_token = auth_result['result']
 
 # Fetch disabled items
-item_payload = {
+items_payload = {
     'jsonrpc': '2.0',
     'method': 'item.get',
     'params': {
-        'output': ['name', 'status'],
-        'selectHosts': ['host'],
-        'filter': {'status': 1}  # 0 for enabled, 1 for disabled
+        'output': ['itemids', 'name', 'status'],
+        'filter': {'status': 1},  # 1 for disabled items
+        'selectHosts': ['host', 'hostid'],
     },
     'auth': auth_token,
-    'id': 2
+    'id': 2,
 }
 
-response = requests.post(zabbix_url, json=item_payload, headers=headers)
-item_data = response.json()
+response = requests.post(ZABBIX_URL, data=json.dumps(items_payload), headers=headers, verify=False)
+items_result = response.json()
 
-# Create Excel workbook and sheet
-workbook = openpyxl.Workbook()
-sheet = workbook.active
-sheet.title = 'Disabled Items Report'
+# Create Excel report
+wb = Workbook()
+ws = wb.active
+ws.append(['Host', 'Host Group', 'Item Name'])
 
-# Add header row
-sheet.append(['Item Name', 'Status', 'Host', 'Host Group'])
-
-# Iterate through item data and fetch host and host group
-for item in item_data['result']:
+for item in items_result['result']:
+    host = item['hosts'][0]['host']
+    host_group = item['hosts'][0]['hostid']  # You may need to fetch host group separately using hostid
     item_name = item['name']
-    item_status = 'Disabled'
-    host_name = item['hosts'][0]['host']
-    host_group = item['hosts'][0]['groups'][0]['name']
+    ws.append([host, host_group, item_name])
 
-    sheet.append([item_name, item_status, host_name, host_group])
-
-# Save the Excel file
-excel_filename = 'disabled_items_report.xlsx'
-workbook.save(excel_filename)
-print(f"Excel report saved as '{excel_filename}'.")
-
-# Logout
-logout_payload = {
-    'jsonrpc': '2.0',
-    'method': 'user.logout',
-    'params': [],
-    'id': 3,
-    'auth': auth_token
-}
-
-requests.post(zabbix_url, json=logout_payload, headers=headers)
-print("Logged out from Zabbix.")
+# Save the report
+wb.save('disabled_items_report.xlsx')
