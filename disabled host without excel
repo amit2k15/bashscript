@@ -1,0 +1,61 @@
+import requests
+import json
+
+# Zabbix API details
+zabbix_url = 'http://your_zabbix_server/api_jsonrpc.php'
+zabbix_username = 'your_username'
+zabbix_password = 'your_password'
+
+# Authenticate and get the Zabbix API token
+def authenticate():
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        'jsonrpc': '2.0',
+        'method': 'user.login',
+        'params': {
+            'user': zabbix_username,
+            'password': zabbix_password
+        },
+        'id': 1,
+        'auth': None
+    }
+    response = requests.post(zabbix_url, data=json.dumps(payload), headers=headers)
+    return response.json()['result']
+
+# Get all hosts and their items
+def get_disabled_items(auth_token):
+    headers = {
+        'Content-Type': 'application/json-rpc',
+        'Authorization': f'Bearer {auth_token}'
+    }
+    payload = {
+        'jsonrpc': '2.0',
+        'method': 'item.get',
+        'params': {
+            'output': ['hostid', 'name', 'status'],
+            'filter': {'status': 1}  # Disabled items have status 1
+        },
+        'auth': auth_token,
+        'id': 2
+    }
+    response = requests.post(zabbix_url, data=json.dumps(payload), headers=headers)
+    return response.json()['result']
+
+# Main function
+def main():
+    auth_token = authenticate()
+    disabled_items = get_disabled_items(auth_token)
+
+    for item in disabled_items:
+        host_id = item['hostid']
+        item_name = item['name']
+        item_status = item['status']
+
+        # Get host details
+        host_details = get_host_details(auth_token, host_id)
+
+        print(f"Host: {host_details['name']}, Group: {host_details['groups'][0]['name']}, Item: {item_name}, Status: {'Disabled' if item_status == '1' else 'Enabled'}")
+
+# Run the script
+if __name__ == '__main__':
+    main()
