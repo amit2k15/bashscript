@@ -1,93 +1,70 @@
 import requests
+import json
 import openpyxl
 
 # Zabbix API details
-zabbix_url = "http://your_zabbix_server/api_jsonrpc.php"
-zabbix_user = "your_username"
-zabbix_password = "your_password"
+zabbix_url = 'https://your-zabbix-server/api_jsonrpc.php'
+zabbix_user = 'your-username'
+zabbix_password = 'your-password'
 
-# Authenticate and get Zabbix API token
-payload = {
-    "jsonrpc": "2.0",
-    "method": "user.login",
-    "params": {
-        "user": zabbix_user,
-        "password": zabbix_password
+# Authenticate and get the Zabbix API token
+headers = {'Content-Type': 'application/json-rpc'}
+data = {
+    'jsonrpc': '2.0',
+    'method': 'user.login',
+    'params': {
+        'user': zabbix_user,
+        'password': zabbix_password,
     },
-    "id": 1
+    'id': 1,
 }
+response = requests.post(zabbix_url, data=json.dumps(data), headers=headers)
+result = response.json()
 
-response = requests.post(zabbix_url, json=payload)
-auth_result = response.json()
-
-if 'result' in auth_result:
-    auth_token = auth_result['result']
+if 'result' in result:
+    auth_token = result['result']
 else:
-    print("Authentication failed.")
+    print("Login failed. Check your credentials.")
     exit()
 
-# Fetch disabled hosts
-host_payload = {
-    "jsonrpc": "2.0",
-    "method": "host.get",
-    "params": {
-        "output": ["hostid", "host"],
-        "filter": {"status": 1},  # Status 1 represents disabled hosts
-        "selectGroups": ["groupid", "name"],
-        "selectInterfaces": ["ip"]
+# Get disabled items
+data = {
+    'jsonrpc': '2.0',
+    'method': 'item.get',
+    'params': {
+        'output': ['hostid', 'name', 'status'],
+        'filter': {'status': 1},  # 1 indicates disabled items
+        'selectHosts': ['host'],
     },
-    "auth": auth_token,
-    "id": 2
+    'auth': auth_token,
+    'id': 2,
 }
+response = requests.post(zabbix_url, data=json.dumps(data), headers=headers)
+result = response.json()
 
-response = requests.post(zabbix_url, json=host_payload)
-host_result = response.json()
+if 'result' in result:
+    disabled_items = result['result']
+else:
+    print("Failed to fetch disabled items.")
+    exit()
 
-# Fetch host groups
-group_payload = {
-    "jsonrpc": "2.0",
-    "method": "hostgroup.get",
-    "params": {
-        "output": ["groupid", "name"]
-    },
-    "auth": auth_token,
-    "id": 3
-}
+# Create an Excel workbook and worksheet
+workbook = openpyxl.Workbook()
+worksheet = workbook.active
+worksheet.title = "Disabled Items"
 
-response = requests.post(zabbix_url, json=group_payload)
-group_result = response.json()
+# Write headers
+headers = ['Host', 'Host Group', 'Item Name']
+worksheet.append(headers)
 
-# Creating Excel file
-wb = openpyxl.Workbook()
-ws = wb.active
-ws.title = "Disabled Hosts"
+# Get host and host group information for each disabled item
+for item in disabled_items:
+    host = item['hosts'][0]['host']
+    host_group = item['hosts'][0]['groups'][0]['name']
+    item_name = item['name']
+    worksheet.append([host, host_group, item_name])
 
-# Adding headers
-ws.append(["Host ID", "Host Name", "IP Address", "Group ID", "Group Name"])
-
-# Writing data to Excel
-for host in host_result['result']:
-    host_id = host['hostid']
-    host_name = host['host']
-    ip_address = host['interfaces'][0]['ip']
-    group_id = host['groups'][0]['groupid']
-    group_name = host['groups'][0]['name']
-    ws.append([host_id, host_name, ip_address, group_id, group_name])
-
-# Saving the Excel file
-excel_file_path = "disabled_hosts.xlsx"
-wb.save(excel_file_path)
-print(f"Data saved to {excel_file_path}")
-
-# Logout
-logout_payload = {
-    "jsonrpc": "2.0",
-    "method": "user.logout",
-    "params": [],
-    "id": 4,
-    "auth": auth_token
-}
-
-requests.post(zabbix_url, json=logout_payload)
-
-print("Logged out.")
+# Save the workbook
+report_filename = 'disabled_items_report.xlsx'
+workbook.save(report_filename)
+print(f"Report saved as {report_filename}")
