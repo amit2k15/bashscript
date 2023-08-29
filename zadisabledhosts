@@ -1,61 +1,104 @@
 import requests
-import json
+import openpyxl
 
-# Zabbix API details
+# Zabbix API configuration
 zabbix_url = 'http://your_zabbix_server/api_jsonrpc.php'
-zabbix_username = 'your_username'
+zabbix_user = 'your_username'
 zabbix_password = 'your_password'
 
-# Authenticate and get the Zabbix API token
-def authenticate():
-    headers = {'Content-Type': 'application/json'}
-    payload = {
-        'jsonrpc': '2.0',
-        'method': 'user.login',
-        'params': {
-            'user': zabbix_username,
-            'password': zabbix_password
+# Authenticate with Zabbix API
+auth_payload = {
+    "jsonrpc": "2.0",
+    "method": "user.login",
+    "params": {
+        "user": zabbix_user,
+        "password": zabbix_password
+    },
+    "id": 1,
+}
+
+response = requests.post(zabbix_url, json=auth_payload)
+auth_result = response.json()
+
+if "result" in auth_result:
+    auth_token = auth_result["result"]
+else:
+    raise Exception("Failed to authenticate with Zabbix API")
+
+# Get disabled items
+disabled_items_payload = {
+    "jsonrpc": "2.0",
+    "method": "item.get",
+    "params": {
+        "output": ["name", "key_", "status"],
+        "filter": {"status": 1}  # 1 represents disabled items
+    },
+    "auth": auth_token,
+    "id": 2,
+}
+
+response = requests.post(zabbix_url, json=disabled_items_payload)
+disabled_items_result = response.json()
+
+if "result" in disabled_items_result:
+    disabled_items = disabled_items_result["result"]
+else:
+    raise Exception("Failed to retrieve disabled items")
+
+# Get hosts and host groups for disabled items
+disabled_items_report = []
+
+for item in disabled_items:
+    item_name = item["name"]
+    item_key = item["key_"]
+
+    host_payload = {
+        "jsonrpc": "2.0",
+        "method": "item.get",
+        "params": {
+            "output": ["hostid"],
+            "filter": {"key_": item_key}
         },
-        'id': 1,
-        'auth': None
+        "auth": auth_token,
+        "id": 3,
     }
-    response = requests.post(zabbix_url, data=json.dumps(payload), headers=headers)
-    return response.json()['result']
 
-# Get all hosts and their items
-def get_disabled_items(auth_token):
-    headers = {
-        'Content-Type': 'application/json-rpc',
-        'Authorization': f'Bearer {auth_token}'
-    }
-    payload = {
-        'jsonrpc': '2.0',
-        'method': 'item.get',
-        'params': {
-            'output': ['hostid', 'name', 'status'],
-            'filter': {'status': 1}  # Disabled items have status 1
-        },
-        'auth': auth_token,
-        'id': 2
-    }
-    response = requests.post(zabbix_url, data=json.dumps(payload), headers=headers)
-    return response.json()['result']
+    response = requests.post(zabbix_url, json=host_payload)
+    host_result = response.json()
 
-# Main function
-def main():
-    auth_token = authenticate()
-    disabled_items = get_disabled_items(auth_token)
+    if "result" in host_result and host_result["result"]:
+        host_id = host_result["result"][0]["hostid"]
 
-    for item in disabled_items:
-        host_id = item['hostid']
-        item_name = item['name']
-        item_status = item['status']
+        host_group_payload = {
+            "jsonrpc": "2.0",
+            "method": "host.get",
+            "params": {
+                "output": ["host", "groups"],
+                "filter": {"hostid": host_id},
+                "selectGroups": "extend"
+            },
+            "auth": auth_token,
+            "id": 4,
+        }
 
-        # Get host details
-        host_details = get_host_details(auth_token, host_id)
+        response = requests.post(zabbix_url, json=host_group_payload)
+        host_group_result = response.json()
 
-        print(f"Host: {host_details['name']}, Group: {host_details['groups'][0]['name']}, Item: {item_name}, Status: {'Disabled' if item_status == '1' else 'Enabled'}")
+        if "result" in host_group_result and host_group_result["result"]:
+            host = host_group_result["result"][0]["host"]
+            host_groups = [group["name"] for group in host_group_result["result"][0]["groups"]]
 
-# Run the script
-if __name__ == '__main__':
-    main()
+            disabled_items_report.append({"item_name": item_name, "host": host, "host_groups": host_groups})
+
+# Create Excel report
+workbook = openpyxl.Workbook()
+worksheet = workbook.active
+worksheet.title = "Disabled Items Report"
+worksheet.append(["Item Name", "Host", "Host Groups"])
+
+for entry in disabled_items_report:
+    worksheet.append([entry["item_name"], entry["host"], ", ".join(entry["host_groups"])])
+
+report_filename = "disabled_items_report.xlsx"
+workbook.save(report_filename)
+print(f"Report saved as {report_filename}")
