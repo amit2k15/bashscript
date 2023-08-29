@@ -1,56 +1,61 @@
 import requests
 import json
-from openpyxl import Workbook
 
-# Zabbix API credentials
-ZABBIX_URL = 'https://your_zabbix_instance/api_jsonrpc.php'
-ZABBIX_USER = 'your_username'
-ZABBIX_PASSWORD = 'your_password'
+# Zabbix API details
+zabbix_url = 'http://your_zabbix_server/api_jsonrpc.php'
+zabbix_username = 'your_username'
+zabbix_password = 'your_password'
 
-# Zabbix API headers
-headers = {'Content-Type': 'application/json-rpc'}
+# Authenticate and get the Zabbix API token
+def authenticate():
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        'jsonrpc': '2.0',
+        'method': 'user.login',
+        'params': {
+            'user': zabbix_username,
+            'password': zabbix_password
+        },
+        'id': 1,
+        'auth': None
+    }
+    response = requests.post(zabbix_url, data=json.dumps(payload), headers=headers)
+    return response.json()['result']
 
-# Zabbix API authentication
-auth_payload = {
-    'jsonrpc': '2.0',
-    'method': 'user.login',
-    'params': {
-        'user': ZABBIX_USER,
-        'password': ZABBIX_PASSWORD,
-    },
-    'id': 1,
-}
+# Get all hosts and their items
+def get_disabled_items(auth_token):
+    headers = {
+        'Content-Type': 'application/json-rpc',
+        'Authorization': f'Bearer {auth_token}'
+    }
+    payload = {
+        'jsonrpc': '2.0',
+        'method': 'item.get',
+        'params': {
+            'output': ['hostid', 'name', 'status'],
+            'filter': {'status': 1}  # Disabled items have status 1
+        },
+        'auth': auth_token,
+        'id': 2
+    }
+    response = requests.post(zabbix_url, data=json.dumps(payload), headers=headers)
+    return response.json()['result']
 
-response = requests.post(ZABBIX_URL, data=json.dumps(auth_payload), headers=headers, verify=False)
-auth_result = response.json()
-auth_token = auth_result['result']
+# Main function
+def main():
+    auth_token = authenticate()
+    disabled_items = get_disabled_items(auth_token)
 
-# Fetch disabled items
-items_payload = {
-    'jsonrpc': '2.0',
-    'method': 'item.get',
-    'params': {
-        'output': ['itemids', 'name', 'status'],
-        'filter': {'status': 1},  # 1 for disabled items
-        'selectHosts': ['host', 'hostid'],
-    },
-    'auth': auth_token,
-    'id': 2,
-}
+    for item in disabled_items:
+        host_id = item['hostid']
+        item_name = item['name']
+        item_status = item['status']
 
-response = requests.post(ZABBIX_URL, data=json.dumps(items_payload), headers=headers, verify=False)
-items_result = response.json()
+        # Get host details
+        host_details = get_host_details(auth_token, host_id)
 
-# Create Excel report
-wb = Workbook()
-ws = wb.active
-ws.append(['Host', 'Host Group', 'Item Name'])
+        print(f"Host: {host_details['name']}, Group: {host_details['groups'][0]['name']}, Item: {item_name}, Status: {'Disabled' if item_status == '1' else 'Enabled'}")
 
-for item in items_result['result']:
-    host = item['hosts'][0]['host']
-    host_group = item['hosts'][0]['hostid']  # You may need to fetch host group separately using hostid
-    item_name = item['name']
-    ws.append([host, host_group, item_name])
-
-# Save the report
-wb.save('disabled_items_report.xlsx')
+# Run the script
+if __name__ == '__main__':
+    main()
