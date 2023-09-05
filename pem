@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Check if a keystore file is provided as an argument
+if [ $# -ne 1 ]; then
+  echo "Usage: $0 <keystore_file>"
+  exit 1
+fi
+
+keystore_file="$1"
+
+# Check if the keystore file exists
+if [ ! -f "$keystore_file" ]; then
+  echo "Keystore file not found: $keystore_file"
+  exit 1
+fi
+
+# Get a list of aliases in the keystore
+aliases=$(keytool -list -v -keystore "$keystore_file" | grep "Alias name" | cut -d':' -f2 | tr -d ' ')
+
+# Loop through each alias and export the certificate to a PEM file
+for alias in $aliases; do
+  echo "Exporting PEM file for alias: $alias"
+  keytool -exportcert -keystore "$keystore_file" -alias "$alias" -rfc -file "$alias.pem"
+done
+
+echo "Individual PEM files generated successfully."
