@@ -1,0 +1,13 @@
+Hi Brett,
+We have cross-verified the data in Zabbix on the datasotre for the host as mentioned below. 
+It appears that we are currently monitoring this server using SNMP 
+we've observed a recurring pattern in the SNMP data. Every day, During a particular time range each day, we notice that the size of the datastore increases significantly, reaching up to 15 PB according to the SNMP data. However, after a few hours, it reverts to its previous value. There are several reasons for such fluctuations are as follows.
+Filesystem Expansion: VMFS filesystems can be dynamically expanded to accommodate more data by adding storage. This can temporarily make the filesystem appear larger before the changes are fully reflected in SNMP data. We recommend verifying if any resizing or storage allocation activities are occurring during this time.
+
+Data Deduplication or Compression: Some storage systems employ data deduplication or compression techniques to optimize storage usage. This can lead to varying reported sizes as the system dynamically compresses or deduplicates data.
+
+Snapshot Space: Snapshots of virtual machines can consume additional space on the VMFS datastore. The space used by snapshots can vary based on the number and size of snapshots in use.
+
+Data Migration: Data migration or storage vMotion activities can temporarily impact the reported size. If virtual machines or data are being moved between datastores, it can affect the reported usage.
+Could you please let us know your availability to gain a better understanding of the device and feasibility of Zabbix agent installation to capture os level metrics rather than vmware level data.
+Thank you for your attention to this matter.
