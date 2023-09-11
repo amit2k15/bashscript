@@ -1,3 +1,26 @@
 Start-Process -FilePath "C:\path\to\VuGen\vugen.exe" -ArgumentList "/no_gui /mainscript ""C:\path\to\your\script.usr"""
 system.run[powershell.exe -Command "Start-Process -FilePath 'C:\\path\\to\\VuGen\\vugen.exe' -ArgumentList '/no_gui /mainscript ''C:\\path\\to\\your\\script.usr''"]
 
+
+param (
+    [string]$ScriptName
+)
+
+if (-not $ScriptName) {
+    Write-Host "Please provide a script name as an argument."
+    exit 1
+}
+
+$ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath $ScriptName
+
+if (-not (Test-Path -Path $ScriptPath)) {
+    Write-Host "The specified script '$ScriptName' does not exist in the current directory."
+    exit 1
+}
+
+$MdrvPath = "C:\path\to\mdrv.exe"
+$ArgumentList = "-usr '$ScriptPath'"
+
+Start-Process -FilePath $MdrvPath -ArgumentList $ArgumentList -Wait
+
+
