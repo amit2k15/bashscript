@@ -1,7 +1,7 @@
 Start-Process -FilePath "C:\path\to\VuGen\vugen.exe" -ArgumentList "/no_gui /mainscript ""C:\path\to\your\script.usr"""
 system.run[powershell.exe -Command "Start-Process -FilePath 'C:\\path\\to\\VuGen\\vugen.exe' -ArgumentList '/no_gui /mainscript ''C:\\path\\to\\your\\script.usr''"]
 
-
+custom.start_service["powershell -Command \"Start-Service -Name 'Spooler'\""]
 param (
     [string]$ScriptName
 )
