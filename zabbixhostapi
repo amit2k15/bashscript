@@ -2,16 +2,24 @@ import requests
 import json
 import openpyxl
 
-# Zabbix API URL and authentication information
-zabbix_url = 'https://your-zabbix-server.com/api_jsonrpc.php'
+# Zabbix API configuration
+zabbix_url = 'http://your-zabbix-server/api_jsonrpc.php'
 zabbix_user = 'your-username'
 zabbix_password = 'your-password'
 
-# Headers for the API request
-headers = {'Content-Type': 'application/json'}
+# Specific host group name
+host_group_name = 'Your Host Group Name'
 
-# Authenticate with the Zabbix API and get an authentication token
-auth_payload = {
+# Initialize Excel workbook and worksheet
+workbook = openpyxl.Workbook()
+worksheet = workbook.active
+
+# Set column headers
+worksheet.append(['Host Name', 'Status', 'Host Group', 'Host Tag', 'Template'])
+
+# Zabbix API authentication
+session = requests.Session()
+login_data = {
     'jsonrpc': '2.0',
     'method': 'user.login',
     'params': {
@@ -20,93 +28,91 @@ auth_payload = {
     },
     'id': 1,
 }
-
-response = requests.post(zabbix_url, headers=headers, data=json.dumps(auth_payload))
+response = session.post(zabbix_url, json=login_data)
 auth_result = response.json()
+auth_token = auth_result.get('result')
 
-if 'result' not in auth_result:
-    raise Exception("Authentication failed. Check your credentials.")
+if not auth_token:
+    raise Exception("Zabbix authentication failed.")
 
-auth_token = auth_result['result']
-
-# Get host group ID for the specific host group you want
-host_group_name = 'Your Host Group Name'
-get_host_group_payload = {
+# Get host group ID for the specified host group
+get_hostgroup_data = {
     'jsonrpc': '2.0',
     'method': 'hostgroup.get',
     'params': {
-        'output': ['groupid'],
         'filter': {
-            'name': [host_group_name],
+            'name': [host_group_name]
         },
+        'output': 'extend',
     },
     'auth': auth_token,
     'id': 2,
 }
+response = session.post(zabbix_url, json=get_hostgroup_data)
+hostgroup_result = response.json()
+if not hostgroup_result.get('result'):
+    raise Exception(f"Host group '{host_group_name}' not found.")
 
-response = requests.post(zabbix_url, headers=headers, data=json.dumps(get_host_group_payload))
-host_group_result = response.json()
+host_group_id = hostgroup_result['result'][0]['groupid']
 
-if 'result' not in host_group_result:
-    raise Exception("Failed to get host group ID.")
-
-host_group_id = host_group_result['result'][0]['groupid']
-
-# Get host information for the specified host group
-get_hosts_payload = {
+# Get hosts in the specified host group
+get_hosts_data = {
     'jsonrpc': '2.0',
     'method': 'host.get',
     'params': {
-        'output': ['host', 'status'],
-        'selectGroups': ['groupid'],
-        'selectTags': ['tag', 'value'],
         'groupids': [host_group_id],
+        'output': ['hostid', 'name', 'status'],
+        'selectParentTemplates': ['name'],
     },
     'auth': auth_token,
     'id': 3,
 }
-
-response = requests.post(zabbix_url, headers=headers, data=json.dumps(get_hosts_payload))
+response = session.post(zabbix_url, json=get_hosts_data)
 hosts_result = response.json()
 
-if 'result' not in hosts_result:
-    raise Exception("Failed to get host information.")
+if not hosts_result.get('result'):
+    raise Exception(f"No hosts found in '{host_group_name}' host group.")
 
-# Create an Excel workbook and add a worksheet
-workbook = openpyxl.Workbook()
-worksheet = workbook.active
-worksheet.title = 'Host Info'
+# Iterate through the hosts and retrieve the required information
+for host in hosts_result['result']:
+    host_id = host['hostid']
+    host_name = host['name']
+    host_status = 'Enabled' if int(host['status']) == 0 else 'Disabled'
 
-# Write headers to the Excel file
-headers = ['Host', 'Status', 'Host Group', 'Tag', 'Tag Value']
-worksheet.append(headers)
+    # Get host tags
+    get_host_tags_data = {
+        'jsonrpc': '2.0',
+        'method': 'host.get',
+        'params': {
+            'hostids': [host_id],
+            'selectTags': 'extend',
+        },
+        'auth': auth_token,
+        'id': 4,
+    }
+    response = session.post(zabbix_url, json=get_host_tags_data)
+    host_tags_result = response.json()
+    host_tags = host_tags_result['result'][0]['tags'] if host_tags_result['result'] else []
 
-# Extract and write data to the Excel file
-for host_data in hosts_result['result']:
-    host_name = host_data['host']
-    status = host_data['status']
-    host_groups = host_data['groups']
-    tags = host_data['tags']
+    # Filter tags by 'APP'
+    app_tags = [tag for tag in host_tags if tag['tag'] == 'APP']
 
-    host_group = next((group['name'] for group in host_groups), '')
-    tag = next((tag['tag'] for tag in tags if tag['tag'] == 'APP'), '')
-    tag_value = next((tag['value'] for tag in tags if tag['tag'] == 'APP'), '')
+    # Get template names
+    template_names = [template['name'] for template in host['parentTemplates']]
 
-    row_data = [host_name, status, host_group, tag, tag_value]
-    worksheet.append(row_data)
+    # Write data to Excel worksheet
+    for app_tag in app_tags:
+        worksheet.append([host_name, host_status, host_group_name, app_tag['value'], ', '.join(template_names)])
 
-# Save the Excel file
+# Save the data to an Excel file
 workbook.save('zabbix_host_info.xlsx')
-print("Data has been exported to zabbix_host_info.xlsx")
 
-# Logout from the Zabbix API (optional)
-logout_payload = {
+# Logout of the Zabbix API
+logout_data = {
     'jsonrpc': '2.0',
     'method': 'user.logout',
     'params': [],
     'auth': auth_token,
-    'id': 4,
+    'id': 5,
 }
-
-requests.post(zabbix_url, headers=headers, data=json.dumps(logout_payload))
-
+session.post(zabbix_url, json=logout_data)
