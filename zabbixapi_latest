@@ -1,34 +1,18 @@
 SELECT
     h.host AS hostname,
     i.name AS item_name,
-    h.hostid,
-    i.itemid,
-    i.lastvalue,
-    i.lastclock
+    hi.value AS latest_value
 FROM
-    hosts AS h
+    hosts h
 JOIN
-    items AS i ON h.hostid = i.hostid
+    hosts_groups hg ON h.hostid = hg.hostid
+JOIN
+    items i ON h.hostid = i.hostid
+LEFT JOIN
+    history hi ON i.itemid = hi.itemid
 WHERE
-    i.key_ = 'your_item_key'
+    hg.name = 'your_host_group_name'
+    AND i.name = 'your_item_name'
 ORDER BY
-    i.lastclock DESC
+    hi.clock DESC
 LIMIT 1;
-Here's an explanation of what this query does:
-
-We select the columns hostname, item_name, hostid, itemid, lastvalue, and lastclock from the hosts and items tables.
-
-We join the hosts table (aliased as h) with the items table (aliased as i) on the hostid column to relate hosts to their corresponding items.
-
-We use the WHERE clause to filter results for a specific item. Replace 'your_item_key' with the actual key of the item you're interested in.
-
-We order the results by lastclock in descending order, so the most recent data appears first.
-
-Finally, we use LIMIT 1 to retrieve only the latest record.
-
-Make sure you have the necessary permissions to access the Zabbix database, and replace 'your_item_key' with the actual key of the item you want to query. Additionally, you may need to adjust the table and column names if your Zabbix database uses a different naming convention or schema.
-
-
-
-
-
