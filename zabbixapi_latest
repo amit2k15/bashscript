@@ -1,114 +1,34 @@
-import requests
-import pandas as pd
+SELECT
+    h.host AS hostname,
+    i.name AS item_name,
+    h.hostid,
+    i.itemid,
+    i.lastvalue,
+    i.lastclock
+FROM
+    hosts AS h
+JOIN
+    items AS i ON h.hostid = i.hostid
+WHERE
+    i.key_ = 'your_item_key'
+ORDER BY
+    i.lastclock DESC
+LIMIT 1;
+Here's an explanation of what this query does:
 
-# Zabbix API Configuration
-zabbix_url = 'https://your-zabbix-url/api_jsonrpc.php'
-zabbix_username = 'your-username'
-zabbix_password = 'your-password'
+We select the columns hostname, item_name, hostid, itemid, lastvalue, and lastclock from the hosts and items tables.
 
-# Zabbix API Authentication
-auth_payload = {
-    'jsonrpc': '2.0',
-    'method': 'user.login',
-    'params': {
-        'user': zabbix_username,
-        'password': zabbix_password,
-    },
-    'id': 1,
-}
+We join the hosts table (aliased as h) with the items table (aliased as i) on the hostid column to relate hosts to their corresponding items.
 
-response = requests.post(zabbix_url, json=auth_payload)
-auth_result = response.json()
+We use the WHERE clause to filter results for a specific item. Replace 'your_item_key' with the actual key of the item you're interested in.
 
-if 'result' in auth_result:
-    auth_token = auth_result['result']
-else:
-    raise Exception("Zabbix authentication failed.")
+We order the results by lastclock in descending order, so the most recent data appears first.
 
-# Get Hostgroup ID for the specific hostgroup
-hostgroup_name = 'Your Hostgroup Name'
-hostgroup_payload = {
-    'jsonrpc': '2.0',
-    'method': 'hostgroup.get',
-    'params': {
-        'output': 'extend',
-        'filter': {
-            'name': [hostgroup_name],
-        },
-    },
-    'auth': auth_token,
-    'id': 2,
-}
+Finally, we use LIMIT 1 to retrieve only the latest record.
 
-response = requests.post(zabbix_url, json=hostgroup_payload)
-hostgroup_result = response.json()
+Make sure you have the necessary permissions to access the Zabbix database, and replace 'your_item_key' with the actual key of the item you want to query. Additionally, you may need to adjust the table and column names if your Zabbix database uses a different naming convention or schema.
 
-if 'result' in hostgroup_result and hostgroup_result['result']:
-    hostgroup_id = hostgroup_result['result'][0]['groupid']
-else:
-    raise Exception("Hostgroup not found.")
 
-# Get Hosts in the Hostgroup
-host_payload = {
-    'jsonrpc': '2.0',
-    'method': 'host.get',
-    'params': {
-        'output': ['hostid', 'host'],
-        'groupids': hostgroup_id,
-    },
-    'auth': auth_token,
-    'id': 3,
-}
 
-response = requests.post(zabbix_url, json=host_payload)
-host_result = response.json()
 
-hosts = host_result['result']
 
-# Initialize a DataFrame to store the data
-data = []
-
-# Iterate through hosts and fetch the latest item value
-for host in hosts:
-    host_id = host['hostid']
-    host_name = host['host']
-
-    # Define the item key you want to retrieve
-    item_key = 'cert.version'  # Change this to your desired item key
-
-    # Get the latest value for the item
-    item_payload = {
-        'jsonrpc': '2.0',
-        'method': 'item.get',
-        'params': {
-            'output': 'extend',
-            'hostids': host_id,
-            'search': {
-                'key_': item_key,
-            },
-            'sortfield': 'lastvalue',
-            'sortorder': 'DESC',
-            'limit': 1,
-        },
-        'auth': auth_token,
-        'id': 4,
-    }
-
-    response = requests.post(zabbix_url, json=item_payload)
-    item_result = response.json()
-
-    if 'result' in item_result and item_result['result']:
-        latest_value = item_result['result'][0]['lastvalue']
-    else:
-        latest_value = 'N/A'
-
-    data.append({'Host': host_name, 'Latest Value': latest_value})
-
-# Create a DataFrame
-df = pd.DataFrame(data)
-
-# Export the data to Excel
-excel_file = 'zabbix_data.xlsx'
-df.to_excel(excel_file, index=False, engine='openpyxl')
-
-print(f"Data exported to {excel_file}")
