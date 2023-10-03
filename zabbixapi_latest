@@ -1,0 +1,125 @@
+import requests
+import openpyxl
+
+# Zabbix API details
+zabbix_url = 'https://your-zabbix-instance.com/api_jsonrpc.php'
+zabbix_user = 'your-username'
+zabbix_password = 'your-password'
+
+# Hostgroup name and item name
+hostgroup_name = 'YourHostgroupName'
+item_name = 'expiry'
+
+# Authenticate to Zabbix API
+auth_data = {
+    'jsonrpc': '2.0',
+    'method': 'user.login',
+    'params': {
+        'user': zabbix_user,
+        'password': zabbix_password,
+    },
+    'id': 1,
+}
+
+response = requests.post(zabbix_url, json=auth_data)
+auth_result = response.json()
+
+if 'result' in auth_result:
+    auth_token = auth_result['result']
+
+    # Get Hostgroup ID
+    hostgroup_data = {
+        'jsonrpc': '2.0',
+        'method': 'hostgroup.get',
+        'params': {
+            'output': 'extend',
+            'filter': {
+                'name': [hostgroup_name]
+            },
+        },
+        'auth': auth_token,
+        'id': 2,
+    }
+
+    response = requests.post(zabbix_url, json=hostgroup_data)
+    hostgroup_result = response.json()
+
+    if 'result' in hostgroup_result and hostgroup_result['result']:
+        hostgroup_id = hostgroup_result['result'][0]['groupid']
+
+        # Get Hosts in Hostgroup
+        host_data = {
+            'jsonrpc': '2.0',
+            'method': 'host.get',
+            'params': {
+                'output': ['hostid', 'name'],
+                'groupids': [hostgroup_id],
+            },
+            'auth': auth_token,
+            'id': 3,
+        }
+
+        response = requests.post(zabbix_url, json=host_data)
+        host_result = response.json()
+
+        if 'result' in host_result:
+            # Create an Excel workbook
+            workbook = openpyxl.Workbook()
+            sheet = workbook.active
+            sheet.title = 'Zabbix Data'
+
+            # Write headers to Excel
+            sheet['A1'] = 'Hostname'
+            sheet['B1'] = 'Latest Value'
+
+            row = 2  # Start from the second row
+
+            # Loop through hosts
+            for host in host_result['result']:
+                host_id = host['hostid']
+                host_name = host['name']
+
+                # Get the latest item value
+                item_data = {
+                    'jsonrpc': '2.0',
+                    'method': 'item.get',
+                    'params': {
+                        'output': 'extend',
+                        'hostids': host_id,
+                        'search': {
+                            'key_': item_name,
+                        },
+                        'sortfield': 'lastvalue',
+                        'sortorder': 'DESC',
+                        'limit': 1,
+                    },
+                    'auth': auth_token,
+                    'id': 4,
+                }
+
+                response = requests.post(zabbix_url, json=item_data)
+                item_result = response.json()
+
+                if 'result' in item_result and item_result['result']:
+                    latest_value = item_result['result'][0]['lastvalue']
+                else:
+                    latest_value = 'N/A'
+
+                # Write data to Excel
+                sheet[f'A{row}'] = host_name
+                sheet[f'B{row}'] = latest_value
+
+                row += 1
+
+            # Save the Excel file
+            workbook.save('zabbix_data.xlsx')
+
+        else:
+            print('Failed to retrieve host data.')
+
+    else:
+        print('Failed to retrieve hostgroup ID.')
+
+else:
+    print('Authentication failed.')
+
