@@ -1,89 +1,114 @@
 import requests
 import pandas as pd
 
-# Zabbix API URL
-url = 'https://your-zabbix-instance.com/api_jsonrpc.php'
+# Zabbix API Configuration
+zabbix_url = 'https://your-zabbix-url/api_jsonrpc.php'
+zabbix_username = 'your-username'
+zabbix_password = 'your-password'
 
-# Zabbix API credentials
-username = 'your-username'
-password = 'your-password'
-
-# Hostgroup name for filtering
-hostgroup_name = 'Your Hostgroup Name'
-
-# Authenticate with the Zabbix API
-session = requests.Session()
-session.headers.update({'Content-Type': 'application/json'})
-login_data = {
+# Zabbix API Authentication
+auth_payload = {
     'jsonrpc': '2.0',
     'method': 'user.login',
     'params': {
-        'user': username,
-        'password': password,
+        'user': zabbix_username,
+        'password': zabbix_password,
     },
     'id': 1,
 }
-response = session.post(url, json=login_data)
-auth_result = response.json()
-auth_token = auth_result['result']
 
-# Get hosts in the specified hostgroup
-hostgroup_data = {
+response = requests.post(zabbix_url, json=auth_payload)
+auth_result = response.json()
+
+if 'result' in auth_result:
+    auth_token = auth_result['result']
+else:
+    raise Exception("Zabbix authentication failed.")
+
+# Get Hostgroup ID for the specific hostgroup
+hostgroup_name = 'Your Hostgroup Name'
+hostgroup_payload = {
     'jsonrpc': '2.0',
     'method': 'hostgroup.get',
     'params': {
         'output': 'extend',
         'filter': {
-            'name': hostgroup_name,
+            'name': [hostgroup_name],
         },
     },
     'auth': auth_token,
     'id': 2,
 }
-response = session.post(url, json=hostgroup_data)
-hostgroup_result = response.json()
-hostgroup_id = hostgroup_result['result'][0]['groupid']
 
-# Get the latest item value for each host in the hostgroup
-item_data = {
+response = requests.post(zabbix_url, json=hostgroup_payload)
+hostgroup_result = response.json()
+
+if 'result' in hostgroup_result and hostgroup_result['result']:
+    hostgroup_id = hostgroup_result['result'][0]['groupid']
+else:
+    raise Exception("Hostgroup not found.")
+
+# Get Hosts in the Hostgroup
+host_payload = {
     'jsonrpc': '2.0',
-    'method': 'item.get',
+    'method': 'host.get',
     'params': {
-        'output': ['hostid', 'name', 'lastvalue'],
-        'hostids': hostgroup_id,
-        'search': {
-            'key_': 'expiry',
-        },
-        'sortfield': 'name',
+        'output': ['hostid', 'host'],
+        'groupids': hostgroup_id,
     },
     'auth': auth_token,
     'id': 3,
 }
-response = session.post(url, json=item_data)
-item_result = response.json()
 
-# Create a DataFrame to organize the data
+response = requests.post(zabbix_url, json=host_payload)
+host_result = response.json()
+
+hosts = host_result['result']
+
+# Initialize a DataFrame to store the data
 data = []
-for item in item_result['result']:
-    data.append({
-        'Hostname': item['host'],
-        'Item Name': item['name'],
-        'Last Value': item['lastvalue'],
-    })
+
+# Iterate through hosts and fetch the latest item value
+for host in hosts:
+    host_id = host['hostid']
+    host_name = host['host']
+
+    # Define the item key you want to retrieve
+    item_key = 'cert.version'  # Change this to your desired item key
+
+    # Get the latest value for the item
+    item_payload = {
+        'jsonrpc': '2.0',
+        'method': 'item.get',
+        'params': {
+            'output': 'extend',
+            'hostids': host_id,
+            'search': {
+                'key_': item_key,
+            },
+            'sortfield': 'lastvalue',
+            'sortorder': 'DESC',
+            'limit': 1,
+        },
+        'auth': auth_token,
+        'id': 4,
+    }
+
+    response = requests.post(zabbix_url, json=item_payload)
+    item_result = response.json()
+
+    if 'result' in item_result and item_result['result']:
+        latest_value = item_result['result'][0]['lastvalue']
+    else:
+        latest_value = 'N/A'
+
+    data.append({'Host': host_name, 'Latest Value': latest_value})
+
+# Create a DataFrame
 df = pd.DataFrame(data)
 
-# Export data to Excel
-excel_filename = 'zabbix_data.xlsx'
-df.to_excel(excel_filename, index=False)
+# Export the data to Excel
+excel_file = 'zabbix_data.xlsx'
+df.to_excel(excel_file, index=False, engine='openpyxl')
 
-print(f'Data exported to {excel_filename}')
-
-# Logout from the Zabbix API (optional)
-logout_data = {
-    'jsonrpc': '2.0',
-    'method': 'user.logout',
-    'params': [],
-    'auth': auth_token,
-    'id': 4,
-}
-session.post(url, json=logout_data)
+print(f"Data exported to {excel_file}")
