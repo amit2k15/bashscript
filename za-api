@@ -1,0 +1,103 @@
+import requests
+import openpyxl
+
+# Zabbix API URL and authentication information
+zabbix_url = 'https://your-zabbix-server/api_jsonrpc.php'
+zabbix_username = 'your-username'
+zabbix_password = 'your-password'
+
+# Specify the host group you want to retrieve information for
+host_group_name = 'Your Host Group Name'
+
+# Create a session for making API requests
+session = requests.Session()
+
+# Authenticate with the Zabbix API
+login_payload = {
+    'jsonrpc': '2.0',
+    'method': 'user.login',
+    'params': {
+        'user': zabbix_username,
+        'password': zabbix_password
+    },
+    'id': 1,
+}
+response = session.post(zabbix_url, json=login_payload)
+auth_result = response.json()
+auth_token = auth_result['result']
+
+# Get the host group ID by name
+host_group_payload = {
+    'jsonrpc': '2.0',
+    'method': 'hostgroup.get',
+    'params': {
+        'output': 'extend',
+        'filter': {
+            'name': [host_group_name]
+        }
+    },
+    'auth': auth_token,
+    'id': 2,
+}
+response = session.post(zabbix_url, json=host_group_payload)
+host_group_result = response.json()
+host_group_id = host_group_result['result'][0]['groupid']
+
+# Get hosts in the specified host group
+host_payload = {
+    'jsonrpc': '2.0',
+    'method': 'host.get',
+    'params': {
+        'output': ['host', 'status'],
+        'groupids': [host_group_id],
+        'selectItems': ['name', 'status'],
+        'selectTriggers': ['priority', 'description', 'status'],
+        'expandData': 'true'
+    },
+    'auth': auth_token,
+    'id': 3,
+}
+response = session.post(zabbix_url, json=host_payload)
+host_result = response.json()
+
+# Create an Excel workbook and add a worksheet
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "Zabbix Hosts and Triggers"
+
+# Write headers to the Excel sheet
+headers = [
+    'Hostname', 'Host Status', 'Item Name', 'Item Status',
+    'Trigger Severity', 'Trigger Condition', 'Trigger Status'
+]
+for col_num, header in enumerate(headers, 1):
+    ws.cell(row=1, column=col_num, value=header)
+
+# Write host and trigger information to the Excel sheet
+row_num = 2
+for host_info in host_result['result']:
+    hostname = host_info['host']
+    host_status = host_info['status']
+    for item in host_info['items']:
+        item_name = item['name']
+        item_status = item['status']
+        for trigger in item['triggers']:
+            trigger_severity = trigger['priority']
+            trigger_condition = trigger['description']
+            trigger_status = trigger['status']
+            ws.cell(row=row_num, column=1, value=hostname)
+            ws.cell(row=row_num, column=2, value=host_status)
+            ws.cell(row=row_num, column=3, value=item_name)
+            ws.cell(row=row_num, column=4, value=item_status)
+            ws.cell(row=row_num, column=5, value=trigger_severity)
+            ws.cell(row=row_num, column=6, value=trigger_condition)
+            ws.cell(row=row_num, column=7, value=trigger_status)
+            row_num += 1
+
+# Save the Excel file
+excel_file = 'zabbix_host_triggers.xlsx'
+wb.save(excel_file)
+
+# Close the Zabbix API session
+session.close()
+print(f"Excel file '{excel_file}' has been created.")
