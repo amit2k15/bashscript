@@ -1,63 +1,127 @@
+import requests
 import openpyxl
-from pyzabbix import ZabbixAPI
 
-# Zabbix API details
-zabbix_url = 'http://your_zabbix_server_url/zabbix'  # Replace with your Zabbix server URL
-zabbix_user = 'your_username'
-zabbix_password = 'your_password'
+# Zabbix API URL and credentials
+zabbix_url = 'https://your-zabbix-url/api_jsonrpc.php'
+zabbix_user = 'your-username'
+zabbix_password = 'your-password'
 
-# Host group name and IDs (replace with your specific host group)
+# Host group name to retrieve data for
 host_group_name = 'Your Host Group Name'
-host_group_id = None
 
-# Create a Zabbix API connection
-zapi = ZabbixAPI(zabbix_url)
-zapi.login(zabbix_user, zabbix_password)
+# Zabbix API authentication
+session = requests.Session()
+login_data = {
+    'jsonrpc': '2.0',
+    'method': 'user.login',
+    'params': {
+        'user': zabbix_user,
+        'password': zabbix_password
+    },
+    'id': 1,
+}
+response = session.post(zabbix_url, json=login_data)
+auth_result = response.json()
 
-# Get host group ID by name
-host_groups = zapi.hostgroup.get(filter={"name": host_group_name})
-if host_groups:
-    host_group_id = host_groups[0]["groupid"]
+if 'result' in auth_result:
+    auth_token = auth_result['result']
 else:
-    print(f"Host group '{host_group_name}' not found.")
-    zapi.logout()
-    exit()
+    raise Exception('Zabbix authentication failed')
 
-# Create a new Excel workbook
+# Get host group ID
+get_host_group_data = {
+    'jsonrpc': '2.0',
+    'method': 'hostgroup.get',
+    'params': {
+        'filter': {
+            'name': host_group_name
+        },
+        'output': 'extend'
+    },
+    'auth': auth_token,
+    'id': 2,
+}
+response = session.post(zabbix_url, json=get_host_group_data)
+host_group_result = response.json()
+
+if not host_group_result['result']:
+    raise Exception(f'Host group "{host_group_name}" not found')
+
+host_group_id = host_group_result['result'][0]['groupid']
+
+# Get hosts in the host group
+get_hosts_data = {
+    'jsonrpc': '2.0',
+    'method': 'host.get',
+    'params': {
+        'groupids': [host_group_id],
+        'output': ['hostid', 'host', 'status'],
+        'selectItems': ['itemid', 'name', 'status'],
+        'selectTriggers': ['triggerid', 'description', 'priority', 'value', 'status'],
+        'expandData': '1'
+    },
+    'auth': auth_token,
+    'id': 3,
+}
+response = session.post(zabbix_url, json=get_hosts_data)
+hosts_result = response.json()
+
+if 'result' not in hosts_result:
+    raise Exception('Failed to retrieve hosts from Zabbix')
+
+# Create an Excel workbook and worksheet
 workbook = openpyxl.Workbook()
 worksheet = workbook.active
+worksheet.title = 'Zabbix Data'
 
-# Set headers in the Excel sheet
-worksheet.append(["Hostname", "Host Status", "Item Name", "Item Status", "Trigger Severity", "Trigger Condition", "Trigger Status"])
+# Add headers to the Excel sheet
+headers = [
+    'Hostname',
+    'Host Status',
+    'Item Name',
+    'Item Status',
+    'Trigger Severity',
+    'Trigger Condition',
+    'Trigger Status'
+]
+worksheet.append(headers)
 
-# Retrieve hosts in the specified host group
-hosts = zapi.host.get(groupids=[host_group_id], output=["hostid", "host", "status"])
-for host in hosts:
-    hostid = host["hostid"]
-    hostname = host["host"]
-    host_status = "Enabled" if host["status"] == "0" else "Disabled"
+# Iterate through the hosts and their items/triggers
+for host in hosts_result['result']:
+    hostname = host['host']
+    host_status = host['status']
+    
+    for item in host['items']:
+        item_name = item['name']
+        item_status = item['status']
+        
+        for trigger in host['triggers']:
+            trigger_severity = trigger['priority']
+            trigger_condition = trigger['value']
+            trigger_status = trigger['status']
 
-    # Retrieve items for the host
-    items = zapi.item.get(hostids=[hostid], output=["name", "status"])
-    for item in items:
-        item_name = item["name"]
-        item_status = "Enabled" if item["status"] == "0" else "Disabled"
+            # Convert host status and trigger severity codes
+            host_status = 'Enabled' if host_status == '0' else 'Disabled'
+            trigger_severity = {
+                '1': 'Information',
+                '2': 'Minor',
+                '3': 'Warning',
+                '4': 'Major'
+            }.get(str(trigger_severity), 'Unknown')
 
-        # Retrieve triggers for the item
-        triggers = zapi.trigger.get(itemids=[item["itemid"]], output=["description", "priority", "status"])
-        for trigger in triggers:
-            trigger_description = trigger["description"]
-            trigger_severity = trigger["priority"]
-            trigger_condition = trigger_description.split("{HOST.NAME} ")[1]
-            trigger_status = "Enabled" if trigger["status"] == "0" else "Disabled"
-
-            # Append data to the Excel sheet
-            worksheet.append([hostname, host_status, item_name, item_status, trigger_severity, trigger_condition, trigger_status])
+            # Add data to Excel sheet
+            row_data = [
+                hostname,
+                host_status,
+                item_name,
+                item_status,
+                trigger_severity,
+                trigger_condition,
+                trigger_status
+            ]
+            worksheet.append(row_data)
 
 # Save the Excel file
-excel_filename = 'zabbix_data.xlsx'
-workbook.save(excel_filename)
-print(f"Data saved to {excel_filename}")
+workbook.save('zabbix_data.xlsx')
 
-# Logout from Zabbix API
-zapi.logout()
+print('Data exported to zabbix_data.xlsx')
