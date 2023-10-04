@@ -1,0 +1,77 @@
+import openpyxl
+from pyzabbix import ZabbixAPI
+
+# Zabbix API information
+zabbix_url = 'http://your-zabbix-server/zabbix/api_jsonrpc.php'
+zabbix_username = 'your-username'
+zabbix_password = 'your-password'
+
+# Initialize the Zabbix API
+zapi = ZabbixAPI(zabbix_url)
+zapi.login(zabbix_username, zabbix_password)
+
+# Host group name you want to retrieve information for
+host_group_name = 'Your Host Group Name'
+
+# Create an Excel workbook and add a worksheet
+workbook = openpyxl.Workbook()
+worksheet = workbook.active
+
+# Set column headers
+worksheet.append(["Hostname", "Host Status", "Item Name", "Item Status", "Trigger Severity", "Trigger Condition", "Trigger Status"])
+
+# Get hosts in the specified host group
+host_group = zapi.hostgroup.get(filter={"name": host_group_name}, selectHosts=["hostid"])
+hosts = host_group[0]['hosts']
+
+# Loop through hosts
+for host in hosts:
+    hostid = host['hostid']
+    
+    # Get host details
+    host_details = zapi.host.get(
+        hostids=[hostid],
+        output=["host", "status"]
+    )[0]
+
+    # Get items for the host
+    items = zapi.item.get(
+        hostids=[hostid],
+        output=["name", "status"]
+    )
+
+    # Loop through items
+    for item in items:
+        item_name = item['name']
+        item_status = item['status']
+
+        # Get triggers for the item
+        triggers = zapi.trigger.get(
+            itemids=item['itemid'],
+            output=["description", "priority", "expression"]
+        )
+
+        # Loop through triggers
+        for trigger in triggers:
+            trigger_description = trigger['description']
+            trigger_severity = trigger['priority']
+            trigger_expression = trigger['expression']
+
+            # Determine trigger status based on the last event
+            events = zapi.event.get(
+                objectids=trigger['triggerid'],
+                value=1,
+                sortfield="clock",
+                sortorder="DESC",
+                limit=1
+            )
+            trigger_status = "Problem" if events else "OK"
+
+            # Append data to the Excel worksheet
+            worksheet.append([host_details['host'], host_details['status'], item_name, item_status, trigger_severity, trigger_expression, trigger_status])
+
+# Save the Excel file
+workbook.save("zabbix_data.xlsx")
+
+# Logout from Zabbix API
+zapi.logout()
