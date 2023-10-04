@@ -1,127 +1,162 @@
 import requests
-import openpyxl
+import json
+from openpyxl import Workbook
 
-# Zabbix API URL and credentials
-zabbix_url = 'https://your-zabbix-url/api_jsonrpc.php'
-zabbix_user = 'your-username'
+# Zabbix API information
+zabbix_api_url = 'https://your-zabbix-server/api_jsonrpc.php'
+zabbix_username = 'your-username'
 zabbix_password = 'your-password'
 
-# Host group name to retrieve data for
+# Host group name you want to retrieve data for
 host_group_name = 'Your Host Group Name'
 
 # Zabbix API authentication
-session = requests.Session()
-login_data = {
+headers = {'Content-Type': 'application/json-rpc'}
+auth_payload = {
     'jsonrpc': '2.0',
     'method': 'user.login',
     'params': {
-        'user': zabbix_user,
-        'password': zabbix_password
+        'user': zabbix_username,
+        'password': zabbix_password,
     },
     'id': 1,
 }
-response = session.post(zabbix_url, json=login_data)
+
+response = requests.post(zabbix_api_url, data=json.dumps(auth_payload), headers=headers)
 auth_result = response.json()
 
-if 'result' in auth_result:
-    auth_token = auth_result['result']
-else:
+if 'result' not in auth_result:
     raise Exception('Zabbix authentication failed')
 
+auth_token = auth_result['result']
+
 # Get host group ID
-get_host_group_data = {
+host_group_payload = {
     'jsonrpc': '2.0',
     'method': 'hostgroup.get',
     'params': {
+        'output': 'extend',
         'filter': {
-            'name': host_group_name
+            'name': [host_group_name],
         },
-        'output': 'extend'
     },
     'auth': auth_token,
     'id': 2,
 }
-response = session.post(zabbix_url, json=get_host_group_data)
+
+response = requests.post(zabbix_api_url, data=json.dumps(host_group_payload), headers=headers)
 host_group_result = response.json()
 
 if not host_group_result['result']:
-    raise Exception(f'Host group "{host_group_name}" not found')
+    raise Exception('Host group not found')
 
 host_group_id = host_group_result['result'][0]['groupid']
 
 # Get hosts in the host group
-get_hosts_data = {
+host_payload = {
     'jsonrpc': '2.0',
     'method': 'host.get',
     'params': {
-        'groupids': [host_group_id],
         'output': ['hostid', 'host', 'status'],
-        'selectItems': ['itemid', 'name', 'status'],
-        'selectTriggers': ['triggerid', 'description', 'priority', 'value', 'status'],
-        'expandData': '1'
+        'groupids': [host_group_id],
     },
     'auth': auth_token,
     'id': 3,
 }
-response = session.post(zabbix_url, json=get_hosts_data)
-hosts_result = response.json()
 
-if 'result' not in hosts_result:
-    raise Exception('Failed to retrieve hosts from Zabbix')
+response = requests.post(zabbix_api_url, data=json.dumps(host_payload), headers=headers)
+host_result = response.json()
 
-# Create an Excel workbook and worksheet
-workbook = openpyxl.Workbook()
-worksheet = workbook.active
-worksheet.title = 'Zabbix Data'
+if not host_result['result']:
+    raise Exception('No hosts found in the host group')
 
-# Add headers to the Excel sheet
-headers = [
-    'Hostname',
-    'Host Status',
-    'Item Name',
-    'Item Status',
-    'Trigger Severity',
-    'Trigger Condition',
-    'Trigger Status'
-]
-worksheet.append(headers)
+hosts = host_result['result']
 
-# Iterate through the hosts and their items/triggers
-for host in hosts_result['result']:
-    hostname = host['host']
+# Create an Excel workbook
+wb = Workbook()
+ws = wb.active
+ws.title = 'Zabbix Host Data'
+
+# Write headers to the Excel sheet
+headers = ['Hostname', 'Host Status', 'Item Name', 'Item Status', 'Trigger Severity', 'Trigger Condition', 'Trigger Status']
+ws.append(headers)
+
+# Get item and trigger data for each host
+for host in hosts:
+    host_id = host['hostid']
+    host_name = host['host']
     host_status = host['status']
-    
-    for item in host['items']:
+
+    # Get items for the host
+    item_payload = {
+        'jsonrpc': '2.0',
+        'method': 'item.get',
+        'params': {
+            'output': ['name', 'status'],
+            'hostids': [host_id],
+        },
+        'auth': auth_token,
+        'id': 4,
+    }
+
+    response = requests.post(zabbix_api_url, data=json.dumps(item_payload), headers=headers)
+    item_result = response.json()
+
+    items = item_result['result']
+
+    # Get triggers for the host
+    trigger_payload = {
+        'jsonrpc': '2.0',
+        'method': 'trigger.get',
+        'params': {
+            'output': ['description', 'priority', 'expression', 'status'],
+            'hostids': [host_id],
+        },
+        'auth': auth_token,
+        'id': 5,
+    }
+
+    response = requests.post(zabbix_api_url, data=json.dumps(trigger_payload), headers=headers)
+    trigger_result = response.json()
+
+    triggers = trigger_result['result']
+
+    # Write data to the Excel sheet
+    for item in items:
         item_name = item['name']
         item_status = item['status']
-        
-        for trigger in host['triggers']:
-            trigger_severity = trigger['priority']
-            trigger_condition = trigger['value']
+        for trigger in triggers:
+            trigger_description = trigger['description']
+            trigger_priority = trigger['priority']
             trigger_status = trigger['status']
 
-            # Convert host status and trigger severity codes
-            host_status = 'Enabled' if host_status == '0' else 'Disabled'
+            # Map trigger priority to severity
             trigger_severity = {
                 '1': 'Information',
                 '2': 'Minor',
                 '3': 'Warning',
-                '4': 'Major'
-            }.get(str(trigger_severity), 'Unknown')
+                '4': 'Major',
+            }.get(str(trigger_priority), 'Unknown')
 
-            # Add data to Excel sheet
-            row_data = [
-                hostname,
-                host_status,
-                item_name,
-                item_status,
-                trigger_severity,
-                trigger_condition,
-                trigger_status
-            ]
-            worksheet.append(row_data)
+            # Extract trigger condition from the expression
+            trigger_expression = trigger['expression']
+            trigger_condition = trigger_expression.split("{")[1].split("}")[0]
 
-# Save the Excel file
-workbook.save('zabbix_data.xlsx')
+            # Append data to the Excel sheet
+            data_row = [host_name, host_status, item_name, item_status, trigger_severity, trigger_condition, trigger_status]
+            ws.append(data_row)
 
-print('Data exported to zabbix_data.xlsx')
+# Save the Excel workbook
+wb.save('zabbix_host_data.xlsx')
+print('Data saved to zabbix_host_data.xlsx')
+
+# Logout from Zabbix API (optional)
+logout_payload = {
+    'jsonrpc': '2.0',
+    'method': 'user.logout',
+    'params': [],
+    'auth': auth_token,
+    'id': 6,
+}
+
+response = requests.post(zabbix_api_url, data=json.dumps(logout_payload), headers=headers)
