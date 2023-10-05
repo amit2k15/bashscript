@@ -1,0 +1,12 @@
+# Create a Yum repository configuration file for the OpenTelemetry Collector Agent
+sudo tee /etc/yum.repos.d/opentelemetry-collector.repo <<EOF
+[opentelemetry-collector]
+name=OpenTelemetry Collector Repository
+baseurl=https://yum.opentelemetry.io/collector-releases/rpm/x86_64
+enabled=1
+gpgcheck=1
+gpgkey=https://yum.opentelemetry.io/gpgkey | sudo rpm --import -
+EOF
+
+# Install the OpenTelemetry Collector Agent
+sudo yum install opentelemetry-collector
