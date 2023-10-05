@@ -1,0 +1,10 @@
+SELECT 
+  table_name AS `Table`, 
+  subpartition_name AS `Partition`, 
+  ROUND(data_length / 1024 / 1024 / 1024, 2) AS `Size_in_GB`
+FROM 
+  information_schema.partitions
+WHERE 
+  table_schema = 'zabpxc' 
+  AND table_name = 'history' 
+  AND subpartition_name = 'may_2023';
