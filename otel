@@ -1,12 +1,30 @@
-# Create a Yum repository configuration file for the OpenTelemetry Collector Agent
-sudo tee /etc/yum.repos.d/opentelemetry-collector.repo <<EOF
-[opentelemetry-collector]
-name=OpenTelemetry Collector Repository
-baseurl=https://yum.opentelemetry.io/collector-releases/rpm/x86_64
-enabled=1
-gpgcheck=1
-gpgkey=https://yum.opentelemetry.io/gpgkey | sudo rpm --import -
-EOF
+receivers:
+  otlp:
+    protocols:
+      grpc:
 
-# Install the OpenTelemetry Collector Agent
-sudo yum install opentelemetry-collector
+exporters:
+  elasticsearch:
+    type: elasticsearch
+    endpoint: https://your-opensearch-host:9200
+    index: your-index-name
+    username: your-username
+    password: your-password
+    tls:
+      insecure: true # Set this to true to skip SSL verification
+
+processors:
+  batch:
+
+extensions:
+  health_check:
+  pprof:
+  zpages:
+
+service:
+  extensions: [health_check, pprof, zpages]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [elasticsearch]
