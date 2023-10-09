@@ -1,0 +1,51 @@
+import requests
+import json
+
+# Zabbix API URL
+api_url = "https://your-zabbix-url/zabbix/api_jsonrpc.php"
+
+# Replace with your Zabbix username and password
+username = "your_username"
+password = "your_password"
+
+# Zabbix graph ID
+graph_id = 517
+
+# Create a session to store the authentication token
+session = requests.Session()
+
+# Perform user.login request to get the authentication token
+auth_data = {
+    "jsonrpc": "2.0",
+    "method": "user.login",
+    "params": {
+        "user": username,
+        "password": password
+    },
+    "id": 1
+}
+
+response = session.post(api_url, json=auth_data, headers={"Content-Type": "application/json"})
+auth_result = json.loads(response.text)
+
+# Check if the authentication was successful
+if "result" in auth_result:
+    auth_token = auth_result["result"]
+
+    # Construct the URL for the chart
+    chart_url = f"https://your-zabbix-url/zabbix/chart2.php?graphid={graph_id}&from=now-2d&to=now&height=201&width=1717&profileIdx=web.charts.filter&_=up0bkgs0"
+
+    # Download the chart as a PNG file
+    chart_response = session.get(chart_url)
+    
+    if chart_response.status_code == 200:
+        with open("file.png", "wb") as file:
+            file.write(chart_response.content)
+            print("File downloaded successfully as 'file.png'")
+    else:
+        print(f"Failed to download chart. Status code: {chart_response.status_code}")
+else:
+    print("Authentication failed. Check your credentials.")
+
+# Close the session
+session.close()
