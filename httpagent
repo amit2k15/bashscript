@@ -1,0 +1,28 @@
+# Specify the new header value
+new_header_value = 'your-new-token-value'
+
+# Create the item.update request payload
+update_item_payload = {
+    "jsonrpc": "2.0",
+    "method": "item.update",
+    "params": {
+        "itemid": item_id,
+        "headers": [
+            {
+                "name": "Token",
+                "value": new_header_value
+            }
+        ]
+    },
+    "id": 1,
+    "auth": None
+}
+
+# Send the item.update request
+response = session.post(zabbix_api_url, data=json.dumps(update_item_payload))
+
+# Check the response for success or error
+if 'result' in response.json():
+    print("Item updated successfully.")
+else:
+    print("Item update failed: ", response.json()['error'])
