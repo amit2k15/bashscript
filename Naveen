@@ -1,0 +1,18 @@
+Subject: Request for Assistance: Opening Firewall Port for Zabbix Application Upgrade
+
+Dear Naveen,
+
+I hope this email finds you well. I am writing to inform you about a critical update we are planning for our Zabbix application and to seek your expertise and assistance in ensuring a smooth transition.
+
+Currently, our Zabbix application is hosted on our "Current" server, and there is communication established from our DMZ server to the old application server. However, as we prepare to upgrade to a new server, we have encountered an issue where there is no communication path from our DMZ to the new server.
+
+In light of this situation, we urgently need to open a firewall port to facilitate communication between the DMZ server and the new Core server. This is a crucial step in ensuring the success of our Zabbix application upgrade.
+
+We understand that your expertise in network and firewall configurations is invaluable, and we kindly request your help in promptly addressing this matter. We would greatly appreciate your assistance in configuring the firewall rules, allowing the necessary communication to take place.
+
+To discuss this in more detail and ensure a seamless transition, we would like to schedule a meeting or discussion at your earliest convenience. Please let us know your availability, and we will coordinate a suitable time for a detailed discussion.
+
+Your prompt attention to this request is highly appreciated, as the upgrade is a time-sensitive project. Your assistance will play a vital role in ensuring the project's success.
+
+Thank you in advance for your support, Naveen. We look forward to working with you to resolve this issue and proceed with our Zabbix application upgrade smoothly.
+
