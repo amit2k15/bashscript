@@ -1,0 +1,19 @@
+I am writing to request your approval for a Change Request (CR) that has been raised for the purpose of conducting a load test on our new Zabbix Production 6.0 instance from the existing PXC setup to a Proxy SQL setup.As per the recommendations from our DB team, it is crucial that we conduct a load test to thoroughly evaluate the stability and performance of the new production Zabbix instance before proceeding with the migration.
+
+Change Request Details:
+
+CR Number: [Insert CR Number]
+Description: Load Test for New Zabbix Prod 6.0 Instance with Proxy SQL Setup
+
+Your support and approval are crucial to the success of this migration.Your authorization will enable us to proceed with the load test promptly and address any performance-related concerns before the migration.
+
+Please review the attached CR for further details on the load test plan. Let us konwo If you have any questions or require additional information.
+
+Your approval will allow us to move forward with confidence, ensuring that our new Zabbix Production 6.0 instance, with the Proxy SQL setup, meets and exceeds our expectations.
+
+Thank you for your attention to this matter, and we look forward to your positive response.
+
+@Sheryl: Thank you so much for approving the request.
+
+@Edith/Kranthi: Please check and approve the request from your end.
+
