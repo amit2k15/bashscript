@@ -1,0 +1,25 @@
+var lines = inputText.split('\n');
+
+// Initialize a variable to store the result
+var result = null;
+
+// Loop through the lines to find "% volume full" for "Volume : Odis_Prod"
+for (var i = 0; i < lines.length; i++) {
+    if (lines[i].includes("Volume : Odis_Prod")) {
+        for (var j = i + 1; j < lines.length; j++) {
+            if (lines[j].includes("% volume full")) {
+                // Extract the "% volume full" value
+                result = lines[j].split(":")[1].trim();
+                break;
+            }
+        }
+        break;
+    }
+}
+
+// Print the result
+if (result !== null) {
+    console.log("% volume full for Volume : Odis_Prod: " + result);
+} else {
+    console.log("Volume : Odis_Prod not found in the text.");
+}
