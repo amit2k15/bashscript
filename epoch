@@ -1,0 +1,12 @@
+from datetime import datetime
+import pytz
+
+start_year = 2025
+end_year = 2027
+time_zone = pytz.timezone("US/Central")
+
+for year in range(start_year, end_year + 1):
+    for month in range(1, 13):
+        date = datetime(year, month, 1, 0, 0, 0, tzinfo=time_zone)
+        epoch_time = date.timestamp()
+        print(f"{year}-{month:02d}: {int(epoch_time)}")
