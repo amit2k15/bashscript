@@ -2,8 +2,8 @@ import pymysql
 from openpyxl import Workbook
 from datetime import datetime, timedelta
 
-# MySQL database connection parameters
-db_config = {
+# Database connection configuration
+DB_CONFIG = {
     'host': 'your_mysql_host',
     'user': 'your_mysql_user',
     'password': 'your_mysql_password',
@@ -11,72 +11,74 @@ db_config = {
 }
 
 # Zabbix item key and host group name
-item_key = 'system.cpu.util'
-hostgroup_name = 'your_hostgroup_name'
+ITEM_KEY = 'system.cpu.util'
+HOST_GROUP_NAME = 'YourHostGroupName'
 
-# Connect to the MySQL database
-connection = pymysql.connect(**db_config)
+# Connect to the database
+connection = pymysql.connect(**DB_CONFIG)
+cursor = connection.cursor()
 
-try:
-    with connection.cursor() as cursor:
-        # Calculate date ranges for the last week and last month
-        end_date = datetime.now()
-        last_week_start_date = end_date - timedelta(days=7)
-        last_month_start_date = end_date - timedelta(days=30)
+# Function to execute SQL queries
+def execute_query(query, params=None):
+    cursor.execute(query, params) if params else cursor.execute(query)
+    return cursor.fetchall()
 
-        # Fetch data for the last week
-        last_week_query = (
-            f"SELECT h.host, i.name, AVG(hd.value) as avg_cpu_util "
-            f"FROM history h "
-            f"JOIN items i ON h.itemid = i.itemid "
-            f"JOIN hosts_groups hg ON h.hostid = hg.hostid "
-            f"JOIN groups g ON hg.groupid = g.groupid "
-            f"JOIN history_uint hd ON h.itemid = hd.itemid AND h.clock = hd.clock "
-            f"WHERE i.key_ = '{item_key}' "
-            f"AND g.name = '{hostgroup_name}' "
-            f"AND h.clock >= {int(last_week_start_date.timestamp())} "
-            f"AND h.clock <= {int(end_date.timestamp())} "
-            f"GROUP BY h.host, i.name"
-        )
+# Function to get average CPU utilization for a specific host group
+def get_average_cpu_utilization(host_group_id, start_date, end_date):
+    query = """
+    SELECT hosts.hostid, hosts.host, AVG(history.value) as avg_utilization
+    FROM items
+    JOIN hosts ON items.hostid = hosts.hostid
+    JOIN history ON items.itemid = history.itemid
+    WHERE items.key_ = %s
+    AND hosts.hostid IN (
+        SELECT hostid FROM hosts_groups WHERE groupid = %s
+    )
+    AND history.clock BETWEEN %s AND %s
+    GROUP BY hosts.hostid
+    """
+    params = (ITEM_KEY, host_group_id, start_date, end_date)
+    return execute_query(query, params)
 
-        cursor.execute(last_week_query)
-        last_week_data = cursor.fetchall()
+# Get host group ID
+host_group_query = "SELECT groupid FROM groups WHERE name = %s"
+host_group_id = execute_query(host_group_query, (HOST_GROUP_NAME,))[0][0]
 
-        # Fetch data for the last month
-        last_month_query = (
-            f"SELECT h.host, i.name, AVG(hd.value) as avg_cpu_util "
-            f"FROM history h "
-            f"JOIN items i ON h.itemid = i.itemid "
-            f"JOIN hosts_groups hg ON h.hostid = hg.hostid "
-            f"JOIN groups g ON hg.groupid = g.groupid "
-            f"JOIN history_uint hd ON h.itemid = hd.itemid AND h.clock = hd.clock "
-            f"WHERE i.key_ = '{item_key}' "
-            f"AND g.name = '{hostgroup_name}' "
-            f"AND h.clock >= {int(last_month_start_date.timestamp())} "
-            f"AND h.clock <= {int(end_date.timestamp())} "
-            f"GROUP BY h.host, i.name"
-        )
+# Calculate start and end dates for the last week and last month
+end_date = int(datetime.now().timestamp())
+last_week_start = int((datetime.now() - timedelta(days=7)).timestamp())
+last_month_start = int((datetime.now() - timedelta(days=30)).timestamp())
 
-        cursor.execute(last_month_query)
-        last_month_data = cursor.fetchall()
+# Get average CPU utilization for the last week
+last_week_data = get_average_cpu_utilization(host_group_id, last_week_start, end_date)
 
-finally:
-    connection.close()
+# Get average CPU utilization for the last month
+last_month_data = get_average_cpu_utilization(host_group_id, last_month_start, end_date)
 
-# Create an Excel workbook and add a worksheet
-wb = Workbook()
-ws = wb.active
+# Create an Excel workbook and add data to the sheet
+workbook = Workbook()
+sheet = workbook.active
 
-# Write headers to the worksheet
-headers = ["Host", "Item Name", "Average CPU Utilization (Last Week)", "Average CPU Utilization (Last Month)"]
-ws.append(headers)
+# Write headers
+sheet.append(["Host", "Average CPU Utilization (Last Week)", "Average CPU Utilization (Last Month)"])
 
-# Write data to the worksheet
+# Write data for the last week
 for row in last_week_data:
-    ws.append(row + (None,))  # Append None for the last month column
+    sheet.append([row[1], row[2], None])
 
+# Write data for the last month
 for row in last_month_data:
-    ws.append((row[0], row[1], None, row[2]))  # Append None for the last week column
+    # If the host is already in the sheet, update the corresponding cell
+    for sheet_row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=1):
+        if sheet_row[0].value == row[1]:
+            sheet.cell(row=sheet_row[0].row, column=3, value=row[2])
+            break
+    else:
+        # If the host is not in the sheet, add a new row
+        sheet.append([row[1], None, row[2]])
 
-# Save the workbook to a file
-wb.save("cpu_utilization_report.xlsx")
+# Save the workbook
+workbook.save("cpu_utilization_report.xlsx")
+
+# Close the database connection
+connection.close()
