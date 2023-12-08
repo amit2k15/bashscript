@@ -1,41 +1,40 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
 from email import encoders
-from pathlib import Path
 
-def send_email(sender, receiver, subject, body, attachment_paths):
-    # Set up the SMTP server
-    smtp_server = smtplib.SMTP('localhost')  # Replace 'localhost' with your SMTP server address
+def send_email(to_email, subject, body, attachment_path):
+    # Set up the MIME
+    message = MIMEMultipart()
+    message['From'] = 'your_email@example.com'  # Replace with your email address
+    message['To'] = to_email
+    message['Subject'] = subject
 
-    # Create the email
-    msg = MIMEMultipart()
-    msg['From'] = sender
-    msg['To'] = receiver
-    msg['Subject'] = subject
+    # Attach body text
+    message.attach(MIMEText(body, 'plain'))
 
-    # Add body to the email
-    msg.attach(MIMEText(body, 'plain'))
+    # Attach the file
+    with open(attachment_path, 'rb') as attachment:
+        part = MIMEBase('application', 'zip')
+        part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f'attachment; filename="{attachment_path}"')
+        message.attach(part)
 
-    # Attach files
-    for path in attachment_paths:
-        attachment = MIMEBase('application', 'octet-stream')
-        with open(path, 'rb') as file:
-            attachment.set_payload(file.read())
-        encoders.encode_base64(attachment)
-        attachment.add_header('Content-Disposition', f'attachment; filename={Path(path).name}')
-        msg.attach(attachment)
+    # Connect to the SMTP server and send the email
+    try:
+        server = smtplib.SMTP('your_smtp_server.com')  # Replace with your SMTP server
+        server.sendmail(message['From'], to_email, message.as_string())
+        server.quit()
+        print("Email sent successfully")
+    except Exception as e:
+        print(f"Error sending email: {e}")
 
-    # Send the email
-    smtp_server.sendmail(sender, receiver, msg.as_string())
-    smtp_server.quit()
+# Example usage
+to_address = 'recipient@example.com'
+email_subject = 'Test Email'
+email_body = 'This is a test email.'
+attachment_file_path = 'path/to/your/file.zip'
 
-# Usage example
-sender = 'your_email@example.com'
-receiver = 'recipient@example.com'
-subject = 'Test Email'
-body = 'This is a test email.'
-attachment_paths = ['path/to/file1.txt', 'path/to/file2.jpg']
-
-send_email(sender, receiver, subject, body, attachment_paths)
+send_email(to_address, email_subject, email_body, attachment_file_path)
