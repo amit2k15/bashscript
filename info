@@ -1,0 +1,74 @@
+Sub CreateMonitoringPresentation()
+    Dim pptApp As Object
+    Dim pptPres As Object
+    Dim slideIndex As Integer
+    Dim slide As Object
+    Dim ws As Worksheet
+    Dim currentRow As Integer
+    Dim totalApps As Integer
+    
+    ' Initialize PowerPoint
+    On Error Resume Next
+    Set pptApp = GetObject(, "PowerPoint.Application")
+    If pptApp Is Nothing Then Set pptApp = CreateObject("PowerPoint.Application")
+    On Error GoTo 0
+    pptApp.Visible = True
+    Set pptPres = pptApp.Presentations.Add
+    
+    ' Set the worksheet containing data
+    Set ws = ThisWorkbook.Sheets("Data") ' Change "Data" to the name of your worksheet
+    
+    ' Get the total number of applications
+    totalApps = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row - 1 ' Assuming column A has application names
+    
+    ' Slide 1: Title Slide
+    Set slide = pptPres.Slides.Add(1, ppLayoutTitle)
+    slide.Shapes.Title.TextFrame.TextRange.Text = "Monitoring and SRE Practices"
+    slide.Shapes.Placeholders(2).TextFrame.TextRange.Text = "Improving Application Efficiency for X Line of Business"
+    
+    ' Slide 2: Overview
+    slideIndex = slideIndex + 1
+    Set slide = pptPres.Slides.Add(slideIndex, ppLayoutText)
+    slide.Shapes.Title.TextFrame.TextRange.Text = "Overview"
+    slide.Shapes.Placeholders(2).TextFrame.TextRange.Text = _
+        "This presentation covers monitoring and SRE practices for 10 applications." & vbCrLf & _
+        "We'll discuss the current state of monitoring with Zabbix and Dynatrace," & vbCrLf & _
+        "alert statistics for the last 3 months, and areas for improvement."
+    
+    ' Slide 3: Current Monitoring Status
+    slideIndex = slideIndex + 1
+    Set slide = pptPres.Slides.Add(slideIndex, ppLayoutText)
+    slide.Shapes.Title.TextFrame.TextRange.Text = "Current Monitoring Status"
+    slide.Shapes.Placeholders(2).TextFrame.TextRange.Text = _
+        "We are currently using Zabbix and Dynatrace for monitoring." & vbCrLf & _
+        "This slide provides a high-level overview of what we are monitoring."
+    
+    ' Slide 4: Alert Statistics
+    slideIndex = slideIndex + 1
+    Set slide = pptPres.Slides.Add(slideIndex, ppLayoutText)
+    slide.Shapes.Title.TextFrame.TextRange.Text = "Alert Statistics (Last 3 Months)"
+    slide.Shapes.Placeholders(2).TextFrame.TextRange.Text = _
+        "Number of alerts in the last 3 months:" & vbCrLf & _
+        "Application 1: " & ws.Cells(2, 2).Value & vbCrLf & _
+        "Application 2: " & ws.Cells(3, 2).Value & vbCrLf & _
+        "Application 3: " & ws.Cells(4, 2).Value & vbCrLf & _
+        "Application 4: " & ws.Cells(5, 2).Value & vbCrLf & _
+        "Application 5: " & ws.Cells(6, 2).Value & vbCrLf & _
+        "Application 6: " & ws.Cells(7, 2).Value & vbCrLf & _
+        "Application 7: " & ws.Cells(8, 2).Value & vbCrLf & _
+        "Application 8: " & ws.Cells(9, 2).Value & vbCrLf & _
+        "Application 9: " & ws.Cells(10, 2).Value & vbCrLf & _
+        "Application 10: " & ws.Cells(11, 2).Value
+    
+    ' Slide 5: Areas for Improvement
+    slideIndex = slideIndex + 1
+    Set slide = pptPres.Slides.Add(slideIndex, ppLayoutText)
+    slide.Shapes.Title.TextFrame.TextRange.Text = "Areas for Improvement"
+    slide.Shapes.Placeholders(2).TextFrame.TextRange.Text = _
+        "Identify areas where monitoring can be improved." & vbCrLf & _
+        "Discuss new monitoring requirements, gaps, and opportunities for improvement."
+    
+    ' Close PowerPoint
+    Set pptApp = Nothing
+    Set pptPres = Nothing
+End Sub
