@@ -1,0 +1,34 @@
+Certainly! Here's a professional email template for notifying Juan about the scheduled maintenance:
+
+---
+
+**Subject: Scheduled Maintenance for Zabbix Proxy - Monthly Activity**
+
+Dear Juan,
+
+I hope this email finds you well.
+
+I wanted to inform you that we have a scheduled monthly maintenance activity for one of our Zabbix proxies. This maintenance is essential to ensure the continued reliability and performance of our monitoring infrastructure.
+
+**Maintenance Details:**
+- **Date:** [Insert Date]
+- **Time:** [Insert Time]
+- **Duration:** [Insert Duration]
+
+During this maintenance window, the Zabbix proxy will be temporarily unable to fetch metrics from the monitored servers. As a result, you will notice a gap in the graphs and data collection for the affected period.
+
+We apologize for any inconvenience this may cause and appreciate your understanding as we perform this necessary maintenance.
+
+If you have any questions or concerns, please do not hesitate to reach out.
+
+Thank you for your cooperation.
+
+Best regards,
+
+[Your Name]  
+[Your Position]  
+[Your Contact Information]
+
+---
+
+Feel free to adjust the details as necessary.
