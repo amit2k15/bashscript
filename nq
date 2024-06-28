@@ -1,0 +1,23 @@
+select distinct hgp.name as 'Application', 
+                h.host as 'Host_Name', 
+                h.status as 'Host_Status', 
+                l.name as 'Monitor_Name', 
+                l.params, 
+                l.delay as 'Interval', 
+                l.status as 'Monitor_Status', 
+                t.priority as 'Severity', 
+                t.status as 'Trigger_Status',
+                ht.name as 'Monitor_Name', 
+                hs.url, 
+                ht.delay as 'Interval', 
+                ht.status as 'Monitor_Status'
+from hosts_groups hg 
+inner join hstgrp hgp on hg.groupid=hgp.groupid 
+inner join hosts h on h.hostid=hg.hostid 
+inner join items i on h.hostid=i.hostid 
+inner join functions f on i.itemid=f.itemid 
+inner join triggers t on f.triggerid=t.triggerid 
+inner join httptest ht on h.hostid=ht.hostid 
+inner join httpstep hs on ht.httptestid=hs.httptestid 
+where hg.groupid=1056 
+  and i.type=13;
