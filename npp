@@ -1,63 +1,63 @@
-import pandas as pd
 from pyzabbix import ZabbixAPI
+import openpyxl
 
-# Connect to the Zabbix API
-zabbix_server = 'http://your-zabbix-server-url'
-zabbix_user = 'your-username'
-zabbix_password = 'your-password'
+def get_web_scenarios(zapi, host_group_id):
+  """
+  Fetches webscenario information for a specific host group.
 
-zapi = ZabbixAPI(zabbix_server)
-zapi.login(zabbix_user, zabbix_password)
+  Args:
+      zapi: ZabbixAPI object for interacting with the API.
+      host_group_id: ID of the host group to retrieve webscenarios for.
 
-# Function to get data and save it to Excel
-def fetch_zabbix_data(host_group_name):
-    # Fetch host group ID
-    host_groups = zapi.hostgroup.get(filter={"name": host_group_name})
-    if not host_groups:
-        print(f"No host group found with name: {host_group_name}")
-        return
-    host_group_id = host_groups[0]["groupid"]
+  Returns:
+      A list of dictionaries, each containing information for a webscenario.
+  """
+  webscenarios = []
+  # Get web scenarios linked to hosts in the group
+  hosts = zapi.host.get(filter={"groupids": host_group_id}, select_webscenarios=True)
+  for host in hosts:
+    for webscenario in host["webscenarios"]:
+      webscenario_data = {
+          "name": webscenario["name"],
+          "status": webscenario["status"],
+          "update_interval": webscenario["delay"],
+          "step_url": webscenario["steps"][0]["url"]  # Assuming first step
+      }
+      webscenarios.append(webscenario_data)
+  return webscenarios
 
-    # Fetch hosts in the host group
-    hosts = zapi.host.get(groupids=host_group_id, selectItems='extend', selectTriggers='extend', selectHttpTests='extend')
+def generate_excel(data, filename):
+  """
+  Generates an Excel file with webscenario information.
 
-    data = []
+  Args:
+      data: List of dictionaries containing webscenario information.
+      filename: Name of the Excel file to generate.
+  """
+  wb = openpyxl.Workbook()
+  ws = wb.active
+  ws.append(["Web Scenario Name", "Status", "Update Interval", "Step URL"])
+  for scenario in data:
+    ws.append([scenario["name"], scenario["status"], scenario["update_interval"], scenario["step_url"]])
+  wb.save(filename)
 
-    for host in hosts:
-        for item in host['items']:
-            if item['templateid'] == '2':  # Skip items with templateid=2
-                continue
-            for trigger in host['triggers']:
-                if trigger['templateid'] == '2':  # Skip triggers with templateid=2
-                    continue
-                for webscenario in host['httpTests']:
-                    for step in webscenario['steps']:
-                        data.append([
-                            host['host'],  # Host name
-                            host['status'],  # Host status
-                            item['name'],  # Item name
-                            item['status'],  # Item status
-                            item['delay'],  # Item interval
-                            trigger['priority'],  # Trigger severity
-                            trigger['status'],  # Trigger status
-                            webscenario['name'],  # Web scenario name
-                            step['url'],  # URL
-                            step['status_codes'],  # Status codes
-                            step['timeout']  # Delay
-                        ])
+# Replace with your Zabbix server details
+zabbix_server_url = "http://<your_zabbix_server_url>"
+username = "<your_username>"
+password = "<your_password>"
 
-    # Convert to DataFrame
-    columns = [
-        'Host Name', 'Host Status', 'Item Name', 'Item Status', 'Item Interval',
-        'Trigger Severity', 'Trigger Status', 'Web Scenario Name', 'URL', 'Status Codes', 'Delay'
-    ]
-    df = pd.DataFrame(data, columns=columns)
+# Replace with the ID of your host group
+host_group_id = 1  # Change this to the actual ID
 
-    # Save to Excel
-    file_name = f"{host_group_name}.xlsx"
-    df.to_excel(file_name, index=False)
-    print(f"Data saved to {file_name}")
+# Connect to Zabbix API
+zapi = ZabbixAPI(zabbix_server_url)
+zapi.login(username, password)
 
-# Input host group name
-host_group_name = input("Enter the host group name: ")
-fetch_zabbix_data(host_group_name)
+# Get webscenario data for the host group
+web_scenario_data = get_web_scenarios(zapi, host_group_id)
+
+# Generate Excel file
+filename = "webscenario_report.xlsx"
+generate_excel(web_scenario_data, filename)
+
+print(f"Web scenario information saved to: {filename}")
