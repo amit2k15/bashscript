@@ -1,0 +1,88 @@
+import sys
+from pyzabbix import ZabbixAPI
+import pandas as pd
+
+def get_zabbix_data(host_group_name):
+    # Connect to the Zabbix API
+    zapi = ZabbixAPI('https://your-zabbix-url')
+    zapi.login('your-username', 'your-password')
+
+    # Get host group ID by name
+    host_group = zapi.hostgroup.get(filter={"name": host_group_name})
+    if not host_group:
+        print(f"Host group {host_group_name} not found.")
+        return
+    host_group_id = host_group[0]['groupid']
+
+    # Get hosts in the host group
+    hosts = zapi.host.get(groupids=host_group_id, output=["hostid", "name", "status"])
+
+    data = []
+
+    for host in hosts:
+        host_id = host['hostid']
+        host_name = host['name']
+        host_status = 'Enabled' if host['status'] == '0' else 'Disabled'
+
+        # Get items for each host
+        items = zapi.item.get(hostids=host_id, templated=0, output=["itemid", "name", "status", "delay"])
+
+        for item in items:
+            item_name = item['name']
+            item_status = 'Enabled' if item['status'] == '0' else 'Disabled'
+            item_interval = item['delay']
+
+            # Get triggers related to the item
+            triggers = zapi.trigger.get(itemids=item['itemid'], output=["triggerid", "priority", "status", "description"])
+
+            for trigger in triggers:
+                trigger_severity = trigger['priority']
+                trigger_status = 'Enabled' if trigger['status'] == '0' else 'Disabled'
+                trigger_description = trigger['description']
+
+                # Get web scenario steps
+                web_scenarios = zapi.httptest.get(hostids=host_id, output=["httptestid", "name"])
+                for scenario in web_scenarios:
+                    scenario_name = scenario['name']
+                    steps = zapi.httpstep.get(httptestids=scenario['httptestid'], output=["name", "url", "status", "response_time"])
+
+                    for step in steps:
+                        step_name = step['name']
+                        step_url = step['url']
+                        step_status = 'OK' if step['status'] == '0' else 'Failed'
+                        step_duration = step['response_time']
+                        # Assuming there's a way to get step trigger status and severity, though it might require additional queries
+                        step_trigger_status = trigger_status
+                        step_trigger_severity = trigger_severity
+
+                        data.append({
+                            "Host Name": host_name,
+                            "Host Status": host_status,
+                            "Item Name": item_name,
+                            "Item Status": item_status,
+                            "Item Interval": item_interval,
+                            "Trigger Severity": trigger_severity,
+                            "Trigger Status": trigger_status,
+                            "Web Scenario Step Name": step_name,
+                            "URL": step_url,
+                            "Step Status": step_status,
+                            "Step Duration": step_duration,
+                            "Step Trigger Status": step_trigger_status,
+                            "Step Trigger Severity": step_trigger_severity,
+                        })
+
+    # Convert the data to a DataFrame
+    df = pd.DataFrame(data)
+
+    # Save the DataFrame to an Excel file
+    file_name = f"{host_group_name}.xlsx"
+    df.to_excel(file_name, index=False)
+    print(f"Data saved to {file_name}")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python script.py <host_group_name>")
+        sys.exit(1)
+
+    host_group_name = sys.argv[1]
+    get_zabbix_data(host_group_name)
