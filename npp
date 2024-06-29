@@ -1,0 +1,63 @@
+import pandas as pd
+from pyzabbix import ZabbixAPI
+
+# Connect to the Zabbix API
+zabbix_server = 'http://your-zabbix-server-url'
+zabbix_user = 'your-username'
+zabbix_password = 'your-password'
+
+zapi = ZabbixAPI(zabbix_server)
+zapi.login(zabbix_user, zabbix_password)
+
+# Function to get data and save it to Excel
+def fetch_zabbix_data(host_group_name):
+    # Fetch host group ID
+    host_groups = zapi.hostgroup.get(filter={"name": host_group_name})
+    if not host_groups:
+        print(f"No host group found with name: {host_group_name}")
+        return
+    host_group_id = host_groups[0]["groupid"]
+
+    # Fetch hosts in the host group
+    hosts = zapi.host.get(groupids=host_group_id, selectItems='extend', selectTriggers='extend', selectHttpTests='extend')
+
+    data = []
+
+    for host in hosts:
+        for item in host['items']:
+            if item['templateid'] == '2':  # Skip items with templateid=2
+                continue
+            for trigger in host['triggers']:
+                if trigger['templateid'] == '2':  # Skip triggers with templateid=2
+                    continue
+                for webscenario in host['httpTests']:
+                    for step in webscenario['steps']:
+                        data.append([
+                            host['host'],  # Host name
+                            host['status'],  # Host status
+                            item['name'],  # Item name
+                            item['status'],  # Item status
+                            item['delay'],  # Item interval
+                            trigger['priority'],  # Trigger severity
+                            trigger['status'],  # Trigger status
+                            webscenario['name'],  # Web scenario name
+                            step['url'],  # URL
+                            step['status_codes'],  # Status codes
+                            step['timeout']  # Delay
+                        ])
+
+    # Convert to DataFrame
+    columns = [
+        'Host Name', 'Host Status', 'Item Name', 'Item Status', 'Item Interval',
+        'Trigger Severity', 'Trigger Status', 'Web Scenario Name', 'URL', 'Status Codes', 'Delay'
+    ]
+    df = pd.DataFrame(data, columns=columns)
+
+    # Save to Excel
+    file_name = f"{host_group_name}.xlsx"
+    df.to_excel(file_name, index=False)
+    print(f"Data saved to {file_name}")
+
+# Input host group name
+host_group_name = input("Enter the host group name: ")
+fetch_zabbix_data(host_group_name)
