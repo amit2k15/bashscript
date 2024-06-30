@@ -1,71 +1,77 @@
-import pandas as pd
 from pyzabbix import ZabbixAPI
+import pandas as pd
 
-# Replace with your Zabbix server URL and credentials
-ZABBIX_SERVER = 'http://your_zabbix_server/zabbix'
-USERNAME = 'your_username'
-PASSWORD = 'your_password'
+# Replace these with your Zabbix server and credentials
+ZABBIX_SERVER = 'http://your_zabbix_server'
+ZABBIX_USER = 'your_zabbix_username'
+ZABBIX_PASSWORD = 'your_zabbix_password'
+HOST_GROUP_NAME = 'your_host_group_name'
 
-# Connect to the Zabbix API
+# Connect to Zabbix API
 zapi = ZabbixAPI(ZABBIX_SERVER)
-zapi.login(USERNAME, PASSWORD)
-
-# Replace with your host group name
-HOST_GROUP_NAME = 'Your Host Group Name'
+zapi.login(ZABBIX_USER, ZABBIX_PASSWORD)
 
 # Fetch the host group ID
-host_group = zapi.hostgroup.get(filter={"name": HOST_GROUP_NAME})
-host_group_id = host_group[0]['groupid']
+host_groups = zapi.hostgroup.get(filter={"name": HOST_GROUP_NAME})
+if not host_groups:
+    raise ValueError("Host group not found")
+host_group_id = host_groups[0]['groupid']
 
 # Fetch hosts in the host group
-hosts = zapi.host.get(groupids=host_group_id, selectInterfaces=['ip'])
+hosts = zapi.host.get(groupids=host_group_id, output=["hostid", "host", "status"])
 
 # Fetch web scenarios
-web_scenarios = zapi.httptest.get(groupids=host_group_id, selectSteps='extend')
+web_scenarios = zapi.httptest.get(output=["httptestid", "name", "status", "delay"], selectSteps=["url"], hostids=[host['hostid'] for host in hosts])
 
 # Fetch triggers
-triggers = zapi.trigger.get(groupids=host_group_id, selectHosts=['host'], expandDescription=True, expandComment=True)
+triggers = zapi.trigger.get(groupids=host_group_id, output=["triggerid", "description", "priority", "status"])
 
-# Prepare the data
-data = []
+# Create a list to store the results
+results = []
 
+# Map status and severity codes to human-readable form
+status_map = {0: 'enabled', 1: 'disabled'}
+severity_map = {0: 'Not classified', 1: 'Information', 2: 'Minor', 3: 'Warning', 4: 'Major', 5: 'Disaster'}
+
+# Process each host
 for host in hosts:
     host_name = host['host']
-    host_status = 'Enabled' if host['status'] == '0' else 'Disabled'
+    host_status = status_map[int(host['status'])]
 
-    # Get web scenarios for the host
-    host_web_scenarios = [ws for ws in web_scenarios if ws['hostid'] == host['hostid']]
-    for scenario in host_web_scenarios:
-        scenario_name = scenario['name']
-        scenario_status = 'Enabled' if scenario['status'] == '0' else 'Disabled'
-        url = scenario['steps'][0]['url'] if scenario['steps'] else 'N/A'
-        delay = scenario['delay']
+    # Process each web scenario for the host
+    for scenario in web_scenarios:
+        if scenario['hostid'] == host['hostid']:
+            scenario_name = scenario['name']
+            scenario_status = status_map[int(scenario['status'])]
+            scenario_url = scenario['steps'][0]['url'] if scenario['steps'] else ''
+            scenario_delay = scenario['delay']
 
-        # Get triggers for the host
-        host_triggers = [trigger for trigger in triggers if host_name in [h['host'] for h in trigger['hosts']]]
-        for trigger in host_triggers:
-            trigger_name = trigger['description']
-            trigger_severity = {0: 'Not classified', 1: 'Information', 2: 'Warning', 3: 'Average', 4: 'High', 5: 'Disaster'}[int(trigger['priority'])]
-            trigger_status = 'Enabled' if trigger['status'] == '0' else 'Disabled'
-            
-            # Append the data to the list
-            data.append({
-                'Host Name': host_name,
-                'Host Status': host_status,
-                'Web Scenario Name': scenario_name,
-                'Web Scenario Status': scenario_status,
-                'URL': url,
-                'Delay': delay,
-                'Trigger Name': trigger_name,
-                'Trigger Severity': trigger_severity,
-                'Trigger Status': trigger_status,
-                'Host Group': HOST_GROUP_NAME
-            })
+            # Process each trigger for the host
+            for trigger in triggers:
+                if host['hostid'] in trigger['hostid']:
+                    trigger_name = trigger['description']
+                    trigger_severity = severity_map[int(trigger['priority'])]
+                    trigger_status = status_map[int(trigger['status'])]
 
-# Convert the data to a DataFrame
-df = pd.DataFrame(data)
+                    # Only include rows with URLs in the trigger description
+                    if scenario_url:
+                        results.append({
+                            'Host Name': host_name,
+                            'Host Status': host_status,
+                            'Web Scenario Name': scenario_name,
+                            'Web Scenario Status': scenario_status,
+                            'URL': scenario_url,
+                            'Delay': scenario_delay,
+                            'Trigger Name': trigger_name,
+                            'Trigger Severity': trigger_severity,
+                            'Trigger Status': trigger_status
+                        })
 
-# Save to Excel
-df.to_excel(f'{HOST_GROUP_NAME}_report.xlsx', index=False)
+# Convert results to a DataFrame
+df = pd.DataFrame(results)
 
-print(f'Report for {HOST_GROUP_NAME} has been generated and saved as {HOST_GROUP_NAME}_report.xlsx')
+# Save the DataFrame to an Excel sheet
+output_file = f'{HOST_GROUP_NAME}_report.xlsx'
+df.to_excel(output_file, index=False)
+
+print(f'Report generated: {output_file}')
