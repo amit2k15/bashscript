@@ -1,0 +1,7 @@
+Hi Guy,
+
+Following the incident created by Kedar, I have temporarily disabled monitoring for the specified servers in Zabbix. After cross-verifying the alerts, I found they were triggered due to a lack of response from the query for over 10 minutes. This aligns with our Zabbix configuration, which sends an alert if no response is received within that time.
+
+As you mentioned, there was no issue on the database side. This might suggest that network latency could have caused the delay. I will investigate further and coordinate with Kedar to validate, after which I will re-enable monitoring.
+
+Thank you for your patience.
