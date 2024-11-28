@@ -1,0 +1,108 @@
+
+Conversation with Gemini
+
+Python script to take a word file as input and convert table data into Excel table and search the sample query column and find the job_nmae from the query create a  new column in Excel and add the job name only for each row. For ex : if job_name='sahoo' then Excel column value should write as sahoo.
+
+
+Show drafts
+
+
+Understanding the Task
+
+We're tasked with creating a Python script to:
+
+Read a Word document.
+Extract table data.
+Convert the table data to an Excel spreadsheet.
+Search a specific column (e.g., "Sample Query") for keywords.
+Extract "job_name" from the query.
+Add a new column to the Excel spreadsheet and populate it with the extracted "job_name".
+Required Libraries
+
+We'll need the following libraries:
+
+python-docx: To read and parse Word documents.
+openpyxl: To create and manipulate Excel spreadsheets.
+re: For regular expression-based text processing.
+Python Script
+
+Python
+import docx
+from openpyxl import Workbook
+import re
+
+def extract_job_name(query):
+    # Assuming a simple pattern: "job_name='some_name'"
+    match = re.search(r"job_name='([^']+)'", query)
+    if match:
+        return match.group(1)
+    else:
+        return None
+
+def process_word_to_excel(word_file, excel_file):
+    doc = docx.Document(word_file)
+
+    # Create a new Excel workbook
+    workbook = Workbook()
+    sheet = workbook.active
+
+    # Iterate over tables in the Word document
+    for table in doc.tables:
+        for row in table.rows:
+            row_data = []
+            for cell in row.cells:
+                row_data.append(cell.text)
+            sheet.append(row_data)
+
+    # Find the index of the "Sample Query" column
+    query_column_index = sheet[1].index(sheet[1].find("Sample Query"))
+
+    # Add a new column for "Job Name"
+    sheet.insert_cols(query_column_index + 1)
+    sheet.cell(row=1, column=query_column_index + 1).value = "Job Name"
+
+    # Iterate over rows and extract job names
+    for row_num in range(2, sheet.max_row + 1):
+        query = sheet.cell(row=row_num, column=query_column_index).value
+        job_name = extract_job_name(query)
+        sheet.cell(row=row_num, column=query_column_index + 1).value = job_name
+
+    # Save the Excel file
+    workbook.save(excel_file)
+
+# Example usage:
+word_file = "your_word_file.docx"
+excel_file = "output.xlsx"
+process_word_to_excel(word_file, excel_file)
+Use code with caution.
+
+Explanation:
+
+Read Word Document: The python-docx library is used to read the Word document and extract tables.
+Create Excel Workbook: An openpyxl Workbook object is created to store the extracted data.
+Extract Table Data: Each table in the Word document is iterated over, and its rows and cells are extracted.
+Find "Sample Query" Column: The index of the "Sample Query" column is determined.
+Add "Job Name" Column: A new column is inserted next to the "Sample Query" column.
+Extract and Populate Job Names: For each row, the query is extracted, and the extract_job_name function is used to extract the job name. The extracted job name is then populated in the new column.
+Save Excel File: The final Excel file is saved.
+Note:
+
+The extract_job_name function assumes a simple pattern for the job name. You may need to adjust the regular expression if the pattern is different.
+For more complex Word document structures or query patterns, you might need to refine the script's logic.
+Consider error handling and edge cases to make the script more robust.
+By following these steps and customizing the script as needed, you can effectively automate the process of extracting and processing table data from Word documents and generating the desired Excel output.
+
+
+
+
+
+
+
+
+
+
+
+
+
+Gemini can make mistakes, so double-check it
+
