@@ -1,0 +1,27 @@
+Subject: Request for Details to Integrate Dynatrace Data into Grafana
+
+Dear Karan,
+
+As discussed, we are currently working on developing a single consolidated monitoring dashboard across all tools. As part of this initiative, we need to integrate Dynatrace monitoring data for the CareLink Cloud applications hosted on the following instance:
+
+[Insert Instance Details Here]
+
+Could you please check and provide the following details to configure the data source in Grafana:
+
+1. Dynatrace API URL
+
+
+2. API Token with necessary permissions
+
+
+3. Any specific metrics or dashboards that need to be included
+
+
+
+Let us know if you need any further clarification or assistance on this.
+
+Looking forward to your response.
+
+Best regards,
+Amit Kumar Nayak
+
